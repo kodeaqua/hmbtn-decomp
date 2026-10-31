@@ -1,0 +1,7 @@
+#!/bin/sh
+scanner="@HMBTN_WAYLAND_SCANNER@"
+if [ "$1" = "--version" ]; then
+    "$scanner" "$@" >&2
+else
+    exec "$scanner" "$@"
+fi
