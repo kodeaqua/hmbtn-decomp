@@ -53,6 +53,15 @@ source before writing, so overlapping areas do not terminate the game.
 Android GPU Auto attempts compute rendering for each captured frame. Every
 600 attempts, the host logs frame coverage, direct GPU VRAM scanouts, fallback
 count, and the last fallback reason. Explicit Software mode remains available.
+The coverage counter measures the main game-loop path while GPU Auto is
+selected. It excludes frames in explicit Software mode and the separate pause
+menu loop; the pause canvas is composed on the CPU, then uploaded and presented
+through the GPU. Diagnostic frame capture is counted as a CPU fallback. Empty
+display areas and temporarily unavailable swapchains are reported as skipped,
+outside the renderable-frame percentage. Therefore a 100% report means every
+renderable frame observed by that GPU Auto game-loop counter was submitted
+through the GPU scene or direct-VRAM-scanout path; it does not mean all
+application drawing or all engine work ran on the GPU.
 When the PS1 display is disabled, GPU Auto clears the swapchain directly through
 a GPU render pass instead of converting a black frame through the CPU upload
 path. CPU scanout remains available if that render pass cannot be created.
@@ -265,3 +274,65 @@ for game frames. Store captures only in ignored build output. A 6000-tick
 Vulkan/ASan window capture shows farm terrain/player/HUD; a release headless
 capture shows the original grandparent dialogue. Longer headless replays now
 complete the opening and house movement; broader gameplay remains under test.
+
+### Android native-scene tile packet cache (2026-10-31)
+
+The scene compute shader now stages each eligible 8x8 tile's primitive IDs and
+up to 16 complete primitive records in workgroup-shared memory. This applies
+only when scene output matches logical size and is aligned to the tile grid;
+scaled/partial groups and denser tiles retain the global-buffer path. Windows
+Release and ASan/UBSan builds pass 125/125 tests, and the full offscreen scene
+readback/probe suites pass on both D3D12 and Vulkan. The Android Release APK
+builds and was installed on the owner's Helio G100 tablet. One farm log sample
+at 384x240 reported 3.57 ms average game time, 3.99 ms average presentation,
+and 1.3 ms average GPU submit; the owner reports smooth play. This is a single
+device sample, not a controlled before/after benchmark. Adreno results from a
+later build are recorded below; other Mali devices remain unverified.
+
+### Empty-bin workgroup synchronization and cache diagnostics (2026-10-31)
+
+The shader no longer enables packet caching for empty bins. Bins with zero or
+more than 16 primitives now take only the initial workgroup barrier; cached
+bins retain the ID and packet-data barriers. Android perf output reports
+`cache`, `empty`, and `uncached` tile counts so a device capture can show how
+often each shader path runs. In the log, `uncached` means non-empty bins that
+do not qualify for the cache, including dense bins and scaled/misaligned scenes.
+
+Windows Release and ASan/UBSan CTest each pass 125/125, and the D3D12 and
+Vulkan offscreen scene readback probes pass. The Android arm64 Release build
+succeeds with NDK 30.0.16248370, Gradle 9.8.2, and AGP 9.5.0. Its APK is at
+`dist/VanillaBTN-android-v0.9.0.apk`. It was installed on the connected Adreno
+610 after the G100 session; the preceding cache-enabled APK was reported smooth
+on G100. The barrier change has not been runtime-measured on G100. Its Adreno
+farm capture follows.
+
+### Adreno 610 farm capture after tile caching (2026-10-31)
+
+The newly built APK with the workgroup cache and cache diagnostics was
+installed on the connected Redmi device (`SM6225`, `Adreno610v2`, Vulkan).
+The owner reached the farm. Across 20 consecutive one-second performance
+windows at 520x240, the scene contained 665-756 primitives in 1,950 bins,
+averaging 6.5-7.1 references per bin with a maximum of 26. The shader reported
+1,936 cache-eligible bins, zero empty bins, and 14 uncached bins. `gpu` matched
+`presents` in each window.
+
+Average GPU submit ranged from 36.4 to 43.5 ms and presentation from 40.6 to
+48.3 ms; game time was 6.6-10.8 ms, scene construction 5.2-7.8 ms, and CPU VRAM
+materialization 3.8-5.3 ms. The run stayed around 17-21 presents/s. Cumulative
+audio underflow reached 2,680,694 frames with zero dropped frames and a
+735-frame queue. The GPU remains too slow for 60 fps. This sample is not a
+controlled before/after comparison because the earlier farm capture did not
+record primitive counts. KGSL counter reads reset/increased inconsistently and
+GPU clock sysfs access was denied, so this capture does not establish GPU
+utilization or clock frequency.
+
+
+### Current verification (2026-11-01)
+
+The Windows -Game Release build passed 125/125 CTest cases; the Windows
+ASan/UBSan preset passed 108/108. The offscreen GPU renderer probe and
+primitive opcode sweep passed with Vulkan and Direct3D 12, including expanded
+scene readback, whole-canvas presentation, and native/fallback aspect checks.
+Android Release built with NDK 30.0.16248370, Gradle 9.8.2, and AGP 9.5.0.
+No game window or interactive gameplay session was started. Android device
+performance after the current shader changes remains unmeasured.

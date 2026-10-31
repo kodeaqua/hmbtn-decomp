@@ -1122,7 +1122,13 @@ int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data
     size_t bin_offset = primitives + primitive_words;
     size_t list_words = 0;
     u32 max_bin_count = 0;
+    u32 empty_bin_count = 0;
+    u32 shared_cache_bin_count = 0;
     u64 total_bin_references = 0;
+    int shared_cache_scene = s->area.w > 0 && s->area.h > 0 &&
+                            s->width == (u32)s->area.w && s->height == (u32)s->area.h &&
+                            (s->width & (HM_SCENE_BIN_TILE_SIZE - 1)) == 0 &&
+                            (s->height & (HM_SCENE_BIN_TILE_SIZE - 1)) == 0;
     for (size_t i = 0; i < tile_count; ++i) {
         u32 count = s->bins[i * s->bin_stride];
         if (list_words > SIZE_MAX - (size_t)count - 1) {
@@ -1132,6 +1138,10 @@ int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data
         list_words += (size_t)count + 1;
         if (count > max_bin_count)
             max_bin_count = count;
+        if (count == 0)
+            ++empty_bin_count;
+        else if (shared_cache_scene && count <= HM_SCENE_GROUP_PRIMITIVE_CAPACITY)
+            ++shared_cache_bin_count;
         total_bin_references += count;
     }
     if (tile_count > SIZE_MAX - bin_offset || list_words > SIZE_MAX - bin_offset - tile_count) {
@@ -1184,6 +1194,8 @@ int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data
                                 .primitive_count = s->count,
                                 .tile_count = (u32)tile_count,
                                 .max_bin_count = max_bin_count,
+                                .empty_bin_count = empty_bin_count,
+                                .shared_cache_bin_count = shared_cache_bin_count,
                                 .total_bin_references = total_bin_references,
                                 .revision = ++s->revision,
                                 .width = s->width,

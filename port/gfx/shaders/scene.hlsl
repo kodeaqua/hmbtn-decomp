@@ -3,8 +3,17 @@
 Texture2DArray<uint> vram_cache : register(t0, space0);
 ByteAddressBuffer scene : register(t1, space0);
 RWTexture2D<float4> output_image : register(u0, space1);
+#define HM_SCENE_GROUP_PRIMITIVE_CAPACITY 16
+#define HM_SCENE_PRIMITIVE_STRIDE 41
+groupshared uint hm_group_tile_valid;
+groupshared uint hm_group_cache_enabled;
+groupshared uint hm_group_bin;
+groupshared uint hm_group_count;
+groupshared uint hm_group_primitive_ids[HM_SCENE_GROUP_PRIMITIVE_CAPACITY];
+groupshared uint hm_group_primitive_words[HM_SCENE_GROUP_PRIMITIVE_CAPACITY*HM_SCENE_PRIMITIVE_STRIDE];
 uint load_word(uint index){return scene.Load(index*4);}
-uint word(uint p,uint i){return load_word(p+i);}
+uint word(uint p,uint i){uint base=p&0x7fffffffu;
+    return (p&0x80000000u)?hm_group_primitive_words[base+i]:load_word(base+i);}
 uint vram(uint layer,int x,int y){uint2 at=uint2(uint(x)&1023,uint(y)&511);
     uint packed=vram_cache.Load(int4(int2(at.x>>1,at.y),int(layer),0));
     return (packed>>((at.x&1)*16))&65535;}
@@ -52,11 +61,40 @@ uint interp_f(uint3 values,float3 w,float area){return uint(floor(dot(float3(val
 #include "../../enhance/antialiasing/msaa.hlsl"
 #define HM_SCENE_BIN_TILE_SIZE 8
 [numthreads(8,8,1)]
-void main(uint3 id:SV_DispatchThreadID){
-    uint width=load_word(0),height=load_word(1);if(id.x>=width||id.y>=height)return;
+void main(uint3 id:SV_DispatchThreadID,uint3 group:SV_GroupID,uint3 lane:SV_GroupThreadID){
+    uint width=load_word(0),height=load_word(1);
     int2 origin=int2(load_word(2),load_word(3));uint2 logical_size=uint2(load_word(4),load_word(5));
     uint tiles_x=load_word(6),bin_table=load_word(9);
     bool native=(width==logical_size.x&&height==logical_size.y);
+    uint group_thread=lane.y*8+lane.x;
+    if(group_thread==0){
+        hm_group_tile_valid=native&&((width&7)==0)&&((height&7)==0);
+        hm_group_cache_enabled=0;hm_group_bin=0;hm_group_count=0;
+        if(hm_group_tile_valid){
+            uint group_tile=group.y*tiles_x+group.x;
+            hm_group_bin=load_word(bin_table+group_tile);
+            hm_group_count=load_word(hm_group_bin);
+            hm_group_cache_enabled=hm_group_count>0&&
+                hm_group_count<=HM_SCENE_GROUP_PRIMITIVE_CAPACITY;
+        }
+    }
+    GroupMemoryBarrierWithGroupSync();
+    if(hm_group_cache_enabled){
+        if(group_thread<hm_group_count)
+            hm_group_primitive_ids[group_thread]=load_word(hm_group_bin+1+group_thread);
+        GroupMemoryBarrierWithGroupSync();
+        uint primitive_base=load_word(8);
+        uint cache_word_count=hm_group_count*HM_SCENE_PRIMITIVE_STRIDE;
+        [loop]for(uint cache_word=group_thread;cache_word<cache_word_count;cache_word+=64){
+            uint cached_item=cache_word/HM_SCENE_PRIMITIVE_STRIDE;
+            uint primitive_word=cache_word-cached_item*HM_SCENE_PRIMITIVE_STRIDE;
+            uint source=primitive_base+hm_group_primitive_ids[cached_item]*HM_SCENE_PRIMITIVE_STRIDE+
+                primitive_word;
+            hm_group_primitive_words[cache_word]=load_word(source);
+        }
+        GroupMemoryBarrierWithGroupSync();
+    }
+    if(id.x>=width||id.y>=height)return;
     /* Native scenes map one compute pixel to one logical pixel exactly. Avoid
      * two dynamic integer divisions per output pixel on mobile GPUs. */
     int2 local=native?int2(id.xy):
@@ -70,10 +108,13 @@ void main(uint3 id:SV_DispatchThreadID){
     uint3 fine_colors[4]={expand555(color),expand555(color),expand555(color),expand555(color)};
     /* Header[9] points at tile offsets; each offset points to [count, ids...]. */
     uint tile=uint((local.y/HM_SCENE_BIN_TILE_SIZE)*int(tiles_x)+local.x/HM_SCENE_BIN_TILE_SIZE);
-    uint bin=load_word(bin_table+tile);
-    uint count=load_word(bin);
+    uint bin=hm_group_tile_valid?hm_group_bin:load_word(bin_table+tile);
+    uint count=hm_group_tile_valid?hm_group_count:load_word(bin);
     [loop]for(uint item=0;item<count;++item){
-        uint p=load_word(8)+load_word(bin+1+item)*41,op=word(p,1),flags=word(p,4);
+        uint primitive_index=hm_group_cache_enabled?hm_group_primitive_ids[item]:load_word(bin+1+item);
+        uint p=hm_group_cache_enabled?0x80000000u+item*HM_SCENE_PRIMITIVE_STRIDE:
+            load_word(8)+primitive_index*HM_SCENE_PRIMITIVE_STRIDE;
+        uint op=word(p,1),flags=word(p,4);
         int2 clip=int2(word(p,9),word(p,10)),clip_end=clip+int2(word(p,11),word(p,12));
         if(any(logical<clip)||any(logical>=clip_end))continue;
         int2 display=int2(word(p,13),word(p,14)),display_end=display+int2(word(p,15),word(p,16));

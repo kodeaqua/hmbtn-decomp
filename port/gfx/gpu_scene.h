@@ -8,6 +8,7 @@ enum {
     HM_SCENE_STRIDE = 41,
     /* Smaller bins cut per-pixel candidate loops in dense game scenes. */
     HM_SCENE_BIN_TILE_SIZE = 8,
+    HM_SCENE_GROUP_PRIMITIVE_CAPACITY = 16,
     HM_SCENE_INITIAL_PRIMITIVES = 8192,
     HM_SCENE_BIN_WORDS = 257
 };
@@ -19,6 +20,7 @@ typedef struct {
     const u16 *vram_versions; /* Additional packed VRAM snapshots, one 1024x512 layer each. */
     u32 vram_version_count;
     u32 primitive_count, tile_count, max_bin_count;
+    u32 empty_bin_count, shared_cache_bin_count;
     u64 total_bin_references;
     u64 revision;
     u32 width, height;
