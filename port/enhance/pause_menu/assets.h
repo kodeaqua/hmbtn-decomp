@@ -6,6 +6,7 @@
 enum { HM_PAUSE_FONT_W = 128, HM_PAUSE_FONT_H = 120 };
 enum { HM_PAUSE_MAX_VIEW_ITEMS = 40 };
 enum { HM_PAUSE_SHIPPING_ITEMS = 380, HM_PAUSE_RUCKSACK_ITEMS = 8 };
+enum { HM_PAUSE_ITEM_ICON_SIZE = 32 };
 typedef struct {
     u16 font[HM_PAUSE_FONT_W * HM_PAUSE_FONT_H];
     u16 font_light[HM_PAUSE_FONT_W * HM_PAUSE_FONT_H];
@@ -13,9 +14,11 @@ typedef struct {
 typedef struct {
     const char *values[HM_PAUSE_MAX_VIEW_ITEMS];
     const char *shipping_items[HM_PAUSE_SHIPPING_ITEMS];
-    const char *rucksack_items[HM_PAUSE_RUCKSACK_ITEMS];
+    const u32 *shipping_icons[HM_PAUSE_SHIPPING_ITEMS];
+    int shipping_quantities[HM_PAUSE_SHIPPING_ITEMS];
     int shipping_count;
     int shipping_first;
+    int shipping_basket;
     const char *detail;
     const char *notice;
 } hm_pause_view;

@@ -1,5 +1,6 @@
 #ifndef HMBTN_PAUSE_MENU_H
 #define HMBTN_PAUSE_MENU_H
+#include "platform/controls_options.h"
 
 typedef enum {
     HM_PAUSE_ROOT,
@@ -35,12 +36,15 @@ enum {
 #endif
         ,
 #ifdef __ANDROID__
-    HM_PAUSE_CONTROLS_ITEMS = 34,
+    HM_PAUSE_CONTROLS_ITEMS = HM_VIRTUAL_PAD_ROWS_START + HM_VIRTUAL_PAD_ACTIONS,
 #else
-    HM_PAUSE_CONTROLS_ITEMS = 17,
+    HM_PAUSE_CONTROLS_ITEMS = HM_KEYBOARD_BINDING_ROWS,
 #endif
     HM_PAUSE_AUDIO_ITEMS = 3,
     HM_PAUSE_BLESSINGS_ITEMS = 5,
+    HM_PAUSE_SHIPPING_COLUMNS = 4,
+    HM_PAUSE_SHIPPING_ROWS = 2,
+    HM_PAUSE_SHIPPING_VISIBLE_ITEMS = HM_PAUSE_SHIPPING_COLUMNS * HM_PAUSE_SHIPPING_ROWS,
     HM_PAUSE_VISIBLE_ROWS = 7
 };
 
@@ -79,5 +83,6 @@ void hm_pause_open(hm_pause_menu *menu);
 int hm_pause_count(const hm_pause_menu *menu);
 const char *hm_pause_label(const hm_pause_menu *menu, int index);
 hm_pause_action hm_pause_handle(hm_pause_menu *menu, hm_pause_input input);
+hm_pause_input hm_pause_pointer_row_input(hm_pause_page page, int x);
 
 #endif

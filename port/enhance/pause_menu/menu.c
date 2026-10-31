@@ -28,7 +28,7 @@ static const char *const hm_gameplay_items[] = {
 #endif
 };
 static const char *const hm_controls_items[] = {
-    "Gamepad", "Keyboard", "Mouse", "L2", "R2", "L1", "R1", "Triangle", "Circle", "Cross",
+    "Gamepad", "Keyboard", "L2", "R2", "L1", "R1", "Triangle", "Circle", "Cross",
     "Square", "Select", "Start", "Up", "Right", "Down", "Left"
 #ifdef __ANDROID__
     , "Virtual Gamepad", "Button Size", "Edit Layout",
@@ -48,6 +48,12 @@ void hm_pause_open(hm_pause_menu *menu) {
     menu->first_visible = 0;
     menu->graphics_modern = 0;
     menu->content_count = 0;
+}
+
+hm_pause_input hm_pause_pointer_row_input(hm_pause_page page, int x) {
+    if (page == HM_PAUSE_BLESSINGS || x < 192)
+        return HM_PAUSE_CONFIRM;
+    return x < 246 ? HM_PAUSE_LEFT : HM_PAUSE_RIGHT;
 }
 
 int hm_pause_count(const hm_pause_menu *menu) {
@@ -80,6 +86,38 @@ const char *hm_pause_label(const hm_pause_menu *menu, int index) {
 }
 
 hm_pause_action hm_pause_handle(hm_pause_menu *menu, hm_pause_input input) {
+    if (menu->page == HM_PAUSE_SHIPPING &&
+        (input == HM_PAUSE_UP || input == HM_PAUSE_DOWN || input == HM_PAUSE_LEFT ||
+         input == HM_PAUSE_RIGHT)) {
+        int count = hm_pause_count(menu);
+        if (count <= 0)
+            return HM_PAUSE_NONE;
+        int selected = menu->selected;
+        int page_start = (selected / HM_PAUSE_SHIPPING_VISIBLE_ITEMS) *
+                         HM_PAUSE_SHIPPING_VISIBLE_ITEMS;
+        int column = selected % HM_PAUSE_SHIPPING_COLUMNS;
+        if (input == HM_PAUSE_LEFT && column > 0)
+            --selected;
+        else if (input == HM_PAUSE_LEFT && page_start > 0)
+            --selected;
+        else if (input == HM_PAUSE_RIGHT && column < HM_PAUSE_SHIPPING_COLUMNS - 1 &&
+                 selected + 1 < count)
+            ++selected;
+        else if (input == HM_PAUSE_RIGHT &&
+                 selected == page_start + HM_PAUSE_SHIPPING_VISIBLE_ITEMS - 1 &&
+                 selected + 1 < count)
+            ++selected;
+        else if (input == HM_PAUSE_UP && selected >= page_start + HM_PAUSE_SHIPPING_COLUMNS)
+            selected -= HM_PAUSE_SHIPPING_COLUMNS;
+        else if (input == HM_PAUSE_UP && page_start > 0)
+            selected = page_start - HM_PAUSE_SHIPPING_COLUMNS + column;
+        else if (input == HM_PAUSE_DOWN && selected + HM_PAUSE_SHIPPING_COLUMNS < count)
+            selected += HM_PAUSE_SHIPPING_COLUMNS;
+        menu->selected = selected;
+        menu->first_visible = (selected / HM_PAUSE_SHIPPING_VISIBLE_ITEMS) *
+                              HM_PAUSE_SHIPPING_VISIBLE_ITEMS;
+        return HM_PAUSE_NONE;
+    }
     if (input == HM_PAUSE_UP || input == HM_PAUSE_DOWN) {
         int count = hm_pause_count(menu);
         menu->selected = (menu->selected + (input == HM_PAUSE_UP ? count - 1 : 1)) % count;
@@ -121,12 +159,12 @@ hm_pause_action hm_pause_handle(hm_pause_menu *menu, hm_pause_input input) {
         } else if (menu->page == HM_PAUSE_GAMEPLAY) {
             return HM_PAUSE_CHANGE_GAMEPLAY;
         } else if (menu->page == HM_PAUSE_CONTROLS) {
-            if (menu->selected < 3)
+            if (menu->selected < HM_CONTROLS_PRIMARY_ROWS)
                 return HM_PAUSE_CHANGE_CONTROLS;
-            if (menu->selected < 17)
+            if (menu->selected < HM_KEYBOARD_BINDING_ROWS)
                 return HM_PAUSE_REMAP_CONTROLS;
 #ifdef __ANDROID__
-            if (menu->selected == 19)
+            if (menu->selected == HM_VIRTUAL_GAMEPAD_EDIT_ROW)
                 return HM_PAUSE_EDIT_TOUCH_LAYOUT;
             return HM_PAUSE_CHANGE_CONTROLS;
 #else
@@ -151,9 +189,10 @@ hm_pause_action hm_pause_handle(hm_pause_menu *menu, hm_pause_input input) {
         return HM_PAUSE_CHANGE_GAMEPLAY;
     } else if (menu->page == HM_PAUSE_CONTROLS &&
                (input == HM_PAUSE_LEFT || input == HM_PAUSE_RIGHT) &&
-               (menu->selected < 3
+               (menu->selected < HM_CONTROLS_PRIMARY_ROWS
 #ifdef __ANDROID__
-                || (menu->selected >= 17 && menu->selected != 19)
+                || (menu->selected >= HM_VIRTUAL_GAMEPAD_ROW &&
+                    menu->selected != HM_VIRTUAL_GAMEPAD_EDIT_ROW)
 #endif
                 )) {
         return HM_PAUSE_CHANGE_CONTROLS;

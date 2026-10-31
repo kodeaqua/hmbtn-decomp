@@ -27,10 +27,18 @@ reverse the red and blue channels. The private canvas keeps the original cream
 palette, with compact centered root/settings panels and a separate Graphics
 header, aligned label/value columns, selected-row frame and detail footer.
 
-Controls: ESC opens the root menu or backs out one level; ESC at the root resumes.
-Arrows navigate/change options; Enter or X confirms; D goes back. Exit Game
-closes the application. The requested tree is Resume, Settings > Graphics,
-Exit Game. Root and settings have no extra entries.
+Windows pause controls: D-pad, arrow keys, or WASD navigate; left/right change
+values; Enter/K/X selects; and Esc/J backs out (Esc/J resumes from the root).
+Held D-pad and left-stick directions repeat after a short delay. Mouse hover,
+click, and wheel navigate the pause interface only; mouse movement and buttons
+do not move or act in the game.
+
+Android pause controls: tap a row to select it and tap its value to change it.
+Use Circle or the Android Back action to return, and use the virtual or physical
+gamepad's D-pad/Cross/Circle to navigate. Held virtual D-pad directions repeat
+after a short delay. Configured virtual-gamepad mappings remain active while the
+game tick is paused. Exit Game closes the application. The requested tree is
+Resume, Settings > Graphics, Exit Game. Root and settings have no extra entries.
 
 The frozen gameplay background receives a 40% black overlay before drawing the
 original dialog and text at full brightness. Each pause presentation starts
@@ -92,3 +100,12 @@ GPU Auto uses shared scene output at native and enhanced resolution, exposing
 active GPU versus CPU fallback in its detail row. Unsupported shaders/commands
 retain software output. GPU native integer readback checks pass, but actual
 gameplay remains owner-tested. See ADR-054 and gfx/README.md for coverage limits.
+
+The shipping-bin view uses one original-style window with no rucksack panel.
+It shows up to eight shipped entries per page in the native four-column,
+two-row icon grid, keeping all eight framed slots visible when a page is empty.
+The centered item name and quantity sit below the grid; a compact page count and
+touchable page arrows keep pagination inside the window. D-pad and touch can
+select entries. Cross and Circle appear as button marks in the footer. Items without vanilla shipment-count slots, such as
+bamboo shoots, are tracked by exact variant during the current session.
+Portable-basket additions enter that list when the basket is shipped.

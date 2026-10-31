@@ -798,13 +798,15 @@ s32 estate_shipment_add(s32 itemId) {
         }
     }
     shipment->shippedValue += item_sell_price(id);
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SHIPPING_BIN)
+    /* PORT: Track every shipped variant, including items without a vanilla
+     * shipment-count slot (for example bamboo shoots). */
+    hm_gameplay_shipping_record(id);
+#endif
     index = estate_item_slot_index(id);
     if (index == -1) {
         return 0;
     }
-#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SHIPPING_BIN)
-    hm_gameplay_shipping_record(id);
-#endif
     shipment->counts[index]++;
     if (shipment->counts[index] >= 1000U) {
         shipment->counts[index] = ESTATE_STOCK_MAX;
@@ -918,6 +920,10 @@ s32 estate_basket_add(s32 itemId) {
         id = id16;
         basket->contentsValue += item_sell_price(id);
         basket->count++;
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SHIPPING_BIN)
+        /* PORT: Preserve exact variants until the portable basket is merged. */
+        hm_gameplay_shipping_basket_record(id);
+#endif
         index = estate_item_slot_index(id);
         if (index == -1) {
             return 0;
@@ -947,6 +953,11 @@ s32 estate_basket_merge(void) {
         basket->items[i] = 0;
     }
     shipment->shippedValue += basket->contentsValue;
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SHIPPING_BIN)
+    /* PORT: The vanilla basket stores only aggregate shipment slots; retain
+     * item variants separately for the reversible shipping-bin list. */
+    hm_gameplay_shipping_basket_commit();
+#endif
     basket->count = 0;
     basket->contentsValue = 0;
     return 1;

@@ -18,8 +18,11 @@
 #include <string.h>
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
+#define RECT HMBTN_WIN32_RECT
 #include <io.h>
 #include <windows.h>
+#undef RECT
+#undef LoadImage
 #else
 #include <sys/mman.h>
 #endif

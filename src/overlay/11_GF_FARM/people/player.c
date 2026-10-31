@@ -2753,6 +2753,18 @@ static s32 player_act_zone_front(FarmPlayer *player)
         }
         return 0x21;
     case ZONE_SHIPPING_BOX:
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SHIPPING_BIN)
+        /* PORT: Empty-hand list requests are handled before zone dispatch so
+         * they work even when the player stands inside the box zone. */
+        if (hm_gameplay_shipping_bin() && player->held[HELD_ITEM].id == ITEM_NOTHING)
+        {
+            hm_gameplay_shipping_request(HM_SHIPPING_REQUEST_FIXED_BIN);
+        }
+        else if (hit->facing == player->facing38 && player->held[HELD_ITEM].id != ITEM_NOTHING)
+        {
+            player_submit_item_action(player, player->held[HELD_ITEM].id, hit->modelIndex);
+        }
+#else
         if (hit->facing == player->facing38)
         {
 #if defined(HMBTN_PORT) && defined(HMBTN_ENH_SHIPPING_BIN)
@@ -2765,9 +2777,10 @@ static s32 player_act_zone_front(FarmPlayer *player)
             else
 #endif
             {
-            player_submit_item_action(player, player->held[HELD_ITEM].id, hit->modelIndex);
+                player_submit_item_action(player, player->held[HELD_ITEM].id, hit->modelIndex);
             }
         }
+#endif
         return 0x22;
     case ZONE_CHICKEN_FEED_STORE:
         if (hit->facing == player->facing38)
@@ -3235,6 +3248,80 @@ static s32 player_submit_item_action(FarmPlayer *player, s16 selected, s16 value
     return 1;
 }
 
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SHIPPING_BIN)
+static s32 player_shipping_bin_zone_near(FarmPlayer *player)
+{
+    FarmModeScript *data = farm_area.mode.data;
+    s32 slot;
+
+    if (data == 0)
+        return 0;
+
+    for (slot = 0; slot < FARM_ZONE_COUNT; slot++)
+    {
+        FarmZone *zone = &data->zones[slot];
+        s32 dx = 0;
+        s32 dz = 0;
+
+        if (zone->id != ZONE_SHIPPING_BOX || !(zone->flags & ZONE_FLAG_ACTIVE))
+            continue;
+        if (player->position.vx < zone->min.x)
+            dx = zone->min.x - player->position.vx;
+        else if (player->position.vx > zone->max.x)
+            dx = player->position.vx - zone->max.x;
+        if (player->position.vz < zone->min.z)
+            dz = zone->min.z - player->position.vz;
+        else if (player->position.vz > zone->max.z)
+            dz = player->position.vz - zone->max.z;
+
+        if (player->position.vy > zone->min.y - 128 &&
+            player->position.vy < zone->max.y + 120 &&
+            dx <= 400 && dz <= 400 && dx * dx + dz * dz <= 400 * 400)
+            return 1;
+    }
+    return 0;
+}
+
+/* The farm shipping box is a morphing, slotted scene model and some farm data
+ * sets omit its interaction zone. Resolve that front target from the scene
+ * model table while keeping the check limited to the outdoor farm. */
+static s32 player_shipping_bin_model_near(FarmPlayer *player)
+{
+    FarmModeScript *data = farm_area.mode.data;
+    s16 *reach;
+    s32 target_x;
+    s32 target_z;
+    s32 slot;
+
+    if (data == 0 || data->head.place.value != 0 ||
+        data->head.place.location != PLACE_FARM)
+        return 0;
+
+    reach = facing_reach[player->facing38];
+    target_x = player->position.vx + player->velocity[0] + reach[0];
+    target_z = player->position.vz + player->velocity[2] + reach[1];
+    for (slot = 0; slot < SCENE_MODEL_COUNT; slot++)
+    {
+        FarmZoneModel *model = &data->models[slot];
+        s32 dx;
+        s32 dz;
+
+        if ((model->flags & (SCENE_ENTRY_ABSENT | SCENE_ENTRY_HIDDEN | SCENE_ENTRY_TWIN)) ||
+            (model->flags & (SCENE_ENTRY_MORPH | SCENE_ENTRY_SLOTTED)) !=
+                (SCENE_ENTRY_MORPH | SCENE_ENTRY_SLOTTED))
+            continue;
+
+        dx = model->position.vx - target_x;
+        dz = model->position.vz - target_z;
+        if (dx < 0) dx = -dx;
+        if (dz < 0) dz = -dz;
+        if (dx <= 240 && dz <= 240 && dx * dx + dz * dz <= 240 * 240)
+            return 1;
+    }
+    return 0;
+}
+#endif
+
 /* Start the farm operation that the request flags ask for. */
 static s32 player_start_request(FarmPlayer *player, u16 flags)
 {
@@ -3273,7 +3360,16 @@ static s32 player_start_request(FarmPlayer *player, u16 flags)
     }
     if (flags & PAD_CROSS)
     {
-        if (farm_zone_find(&farm_area.mode.script, &player->position, 1) != 0)
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SHIPPING_BIN)
+        if (hm_gameplay_shipping_bin() && player->held[HELD_ITEM].id == ITEM_NOTHING &&
+            (player_shipping_bin_zone_near(player) || player_shipping_bin_model_near(player)))
+        {
+            hm_gameplay_shipping_request(HM_SHIPPING_REQUEST_FIXED_BIN);
+            return 1;
+        }
+#endif
+        FarmZone *player_zone = farm_zone_find(&farm_area.mode.script, &player->position, 1);
+        if (player_zone != 0)
         {
             return 1;
         }
@@ -4741,7 +4837,16 @@ static s16 player_probe_target(FarmPlayer *player, VECTOR *pos, s32 kind_arg)
     {
         mask &= ~0x80;
     }
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+    /* PORT: Mark both forward and side-step movement probes so Walk Crops skips
+     * crop tiles without changing item targeting or other obstacle collisions. */
+    void *walker = (kind == 0x38 || kind == 0) && hm_gameplay_walk_through_crops()
+                       ? player
+                       : 0;
+    result = farm_callback_capped(&probe, player->place, 1000, 1000, &target, &found, walker, mask) * 2;
+#else
     result = farm_callback_capped(&probe, player->place, 1000, 1000, &target, &found, 0, mask) * 2;
+#endif
     farmTargetFlags = 0;
     farmTarget = 0;
     if (kind != ITEM_NOTHING && kind != ITEM_FISHING_ROD)
@@ -4979,6 +5084,21 @@ static inline s32 player_start_held_pose(FarmPlayer *player, s32 anim)
     return 1;
 }
 
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SHIPPING_BIN)
+/* Start the original basket submission animation after the optional basket list. */
+s32 player_shipping_basket_begin(void)
+{
+    FarmPlayer *player = &game_state.player;
+    if (player->held[HELD_ITEM].id != ITEM_BASKET)
+        return 0;
+    player->stateFlags |= PLAYER_FLAG_ACTION_START;
+    player_set_mode(player, PLAYER_MODE_SHIP_BASKET, 0, -2);
+    anim_select_range(&player->secondSprite, player->facing38);
+    player->stateFlags |= PLAYER_FLAG_BIT14;
+    return 1;
+}
+#endif
+
 /* Use the held item. With no argument (held == 0), pick the animation for the item and
  * the target in front of the player; otherwise finish the use. Returns 1 when an
  * animation was started. */
@@ -5088,6 +5208,15 @@ s32 player_use_held_item(s32 held)
     }
     if (player->held[HELD_ITEM].id == ITEM_BASKET)
     {
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SHIPPING_BIN)
+        if (hm_gameplay_shipping_bin() && game_state.progress.estate.basket.count != 0)
+        {
+            /* Square opens the portable basket list; its Ship Basket row starts
+             * the original animated submission after the menu closes. */
+            hm_gameplay_shipping_request(HM_SHIPPING_REQUEST_PORTABLE_BASKET);
+            return 1;
+        }
+#endif
         player->stateFlags |= PLAYER_FLAG_ACTION_START;
         player_set_mode(player, PLAYER_MODE_SHIP_BASKET, 0, -2);
         anim_select_range(&player->secondSprite, player->facing38);
@@ -5214,7 +5343,13 @@ static s32 player_ship_thrown_item(FarmThrownItem *item)
                                   &ignored_x, &ignored_y, 0, 0x200);
     if (result != 0)
     {
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SHIPPING_BIN)
+        u16 count = item->count > 0 ? item->count : 1;
+        while (count-- > 0)
+            estate_shipment_add((u16)item->kind);
+#else
         estate_shipment_add((u16)item->kind);
+#endif
         sound_play(0x13);
         thrown_item_retire(item);
         return 1;
@@ -5241,6 +5376,9 @@ static void thrown_item_clear(FarmThrownItem *item)
     item->phase = THROWN_ITEM_FLY;
     item->timer = 0;
     item->kind = 0;
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SHIPPING_BIN)
+    item->count = 0;
+#endif
     item->vx = 0;
     item->vy = 0;
     item->vz = 0;
@@ -5268,6 +5406,9 @@ static FarmThrownItem *thrown_item_spawn(VECTOR *pos, FarmStoredItem *item, s16 
             effect->dir = dir;
             thrown_item_clear(effect);
             effect->kind = item->id;
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SHIPPING_BIN)
+            effect->count = item->count > 0 ? (u16)item->count : 1;
+#endif
             effect->position.vx = pos->vx;
             effect->position.vy = pos->vy - 300;
             effect->position.vz = pos->vz;
@@ -5615,7 +5756,15 @@ static s32 thrown_item_land(FarmThrownItem *effect)
     }
     if (farm_status_upper_bits() != 0 && game_state.itemInfo[effect->kind].sellPrice != 0)
     {
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SHIPPING_BIN)
+        /* PORT: This is the normal shipping-area landing path. It returns before
+         * player_ship_thrown_item, so record the whole carried stack here. */
+        u16 count = effect->count > 0 ? effect->count : 1;
+        while (count-- > 0)
+            estate_shipment_add((u16)effect->kind);
+#else
         estate_shipment_add((u16)effect->kind);
+#endif
         sound_play(0x13);
         thrown_item_retire(effect);
         event_flag_set(EVENT_FLAG_ITEM_SHIPPED, 1);

@@ -4774,6 +4774,10 @@ static s32 shop_item_grant(s16 item, s16 message0, s16 message1, s16 mode)
         timing.vx = -5000;
         timing.vy = 0;
         timing.vz = 2300;
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SHIPPING_BIN)
+        /* PORT: The scripted basket replacement discards its pending variant list too. */
+        hm_gameplay_shipping_basket_clear();
+#endif
         game_state.progress.estate.basket.count = 0;
         game_state.progress.estate.basket.contentsValue = 0;
         game_state.progress.estate.estateFlags |= ESTATE_FLAG_BASKET;

@@ -268,7 +268,7 @@ add_executable(hmbtn_disc_probe platform/disc_probe.c)
 target_link_libraries(hmbtn_disc_probe PRIVATE hmbtn_psx_initial)
 
 add_executable(hmbtn_boot_probe EXCLUDE_FROM_ALL platform/boot_probe.c platform/input_replay.c
-    platform/frame_capture.c)
+    platform/frame_capture.c platform/crash_handler.c platform/version.c)
 add_library(hmbtn_psx_pending STATIC psx/pending.c)
 target_link_libraries(hmbtn_psx_pending PUBLIC hmbtn_psx_initial)
 target_link_libraries(hmbtn_boot_probe PRIVATE hmbtn_game_initial hmbtn_psx_pending)

@@ -59,7 +59,8 @@ static hm_gameplay_runtime_options active_options = {
 
 #ifdef HMBTN_ENH_SHIPPING_BIN
 static u16 shipping_today[ITEM_COUNT];
-static int shipping_ui_requested;
+static u16 shipping_basket_pending[ITEM_COUNT];
+static int shipping_ui_request;
 #endif
 
 int hm_gameplay_walk_through_crops(void) {
@@ -151,6 +152,31 @@ void hm_gameplay_shipping_record(int item_id) {
 #endif
 }
 
+void hm_gameplay_shipping_basket_record(int item_id) {
+#ifdef HMBTN_ENH_SHIPPING_BIN
+    if (item_id >= 0 && item_id < ITEM_COUNT && shipping_basket_pending[item_id] < 65535)
+        shipping_basket_pending[item_id]++;
+#else
+    (void)item_id;
+#endif
+}
+
+void hm_gameplay_shipping_basket_commit(void) {
+#ifdef HMBTN_ENH_SHIPPING_BIN
+    for (int id = 0; id < ITEM_COUNT; ++id) {
+        u32 total = (u32)shipping_today[id] + shipping_basket_pending[id];
+        shipping_today[id] = total > 65535 ? 65535 : (u16)total;
+    }
+    memset(shipping_basket_pending, 0, sizeof(shipping_basket_pending));
+#endif
+}
+
+void hm_gameplay_shipping_basket_clear(void) {
+#ifdef HMBTN_ENH_SHIPPING_BIN
+    memset(shipping_basket_pending, 0, sizeof(shipping_basket_pending));
+#endif
+}
+
 void hm_gameplay_shipping_forget(int item_id) {
 #ifdef HMBTN_ENH_SHIPPING_BIN
     if (item_id >= 0 && item_id < ITEM_COUNT && shipping_today[item_id] > 0)
@@ -172,20 +198,25 @@ int hm_gameplay_shipping_count(int item_id) {
 void hm_gameplay_shipping_clear(void) {
 #ifdef HMBTN_ENH_SHIPPING_BIN
     memset(shipping_today, 0, sizeof(shipping_today));
-    shipping_ui_requested = 0;
+    shipping_ui_request = HM_SHIPPING_REQUEST_NONE;
 #endif
 }
 
-void hm_gameplay_shipping_request(void) {
+void hm_gameplay_shipping_request(int source) {
 #ifdef HMBTN_ENH_SHIPPING_BIN
-    shipping_ui_requested = 1;
+    if (source == HM_SHIPPING_REQUEST_FIXED_BIN ||
+        source == HM_SHIPPING_REQUEST_PORTABLE_BASKET) {
+        shipping_ui_request = source;
+    }
+#else
+    (void)source;
 #endif
 }
 
 int hm_gameplay_shipping_take_request(void) {
 #ifdef HMBTN_ENH_SHIPPING_BIN
-    int requested = shipping_ui_requested;
-    shipping_ui_requested = 0;
+    int requested = shipping_ui_request;
+    shipping_ui_request = HM_SHIPPING_REQUEST_NONE;
     return requested;
 #else
     return 0;

@@ -311,8 +311,10 @@ int main(int argc, char **argv) {
     CHECK(hm_gameplay_shipping_count(ITEM_TURNIP) == 1);
     hm_gameplay_shipping_forget(ITEM_TURNIP);
     CHECK(hm_gameplay_shipping_count(ITEM_TURNIP) == 0);
-    hm_gameplay_shipping_request();
-    CHECK(hm_gameplay_shipping_take_request() == 1);
+    hm_gameplay_shipping_request(HM_SHIPPING_REQUEST_FIXED_BIN);
+    CHECK(hm_gameplay_shipping_take_request() == HM_SHIPPING_REQUEST_FIXED_BIN);
+    hm_gameplay_shipping_request(HM_SHIPPING_REQUEST_PORTABLE_BASKET);
+    CHECK(hm_gameplay_shipping_take_request() == HM_SHIPPING_REQUEST_PORTABLE_BASKET);
     CHECK(hm_gameplay_shipping_take_request() == 0);
 #endif
 

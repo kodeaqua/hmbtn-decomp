@@ -10,6 +10,10 @@
     } while (0)
 int main(void) {
     hm_pause_menu menu;
+    CHECK(hm_pause_pointer_row_input(HM_PAUSE_BLESSINGS, 250) == HM_PAUSE_CONFIRM);
+    CHECK(hm_pause_pointer_row_input(HM_PAUSE_GAMEPLAY, 191) == HM_PAUSE_CONFIRM);
+    CHECK(hm_pause_pointer_row_input(HM_PAUSE_GAMEPLAY, 192) == HM_PAUSE_LEFT);
+    CHECK(hm_pause_pointer_row_input(HM_PAUSE_GAMEPLAY, 246) == HM_PAUSE_RIGHT);
     hm_pause_open(&menu);
     CHECK(menu.page == HM_PAUSE_ROOT && hm_pause_count(&menu) == 4);
     CHECK(!strcmp(hm_pause_label(&menu, 0), "Resume"));
@@ -88,24 +92,25 @@ int main(void) {
     CHECK(menu.page == HM_PAUSE_CONTROLS && hm_pause_count(&menu) == HM_PAUSE_CONTROLS_ITEMS);
     CHECK(!strcmp(hm_pause_label(&menu, 0), "Gamepad"));
     CHECK(!strcmp(hm_pause_label(&menu, 1), "Keyboard"));
-    CHECK(!strcmp(hm_pause_label(&menu, 2), "Mouse"));
+    CHECK(!strcmp(hm_pause_label(&menu, 2), "L2"));
     for (int i = 0; i < HM_PAUSE_CONTROLS_ITEMS; ++i) {
         CHECK(menu.selected == i);
-        int option_row = i < 3;
+        int option_row = i < HM_CONTROLS_PRIMARY_ROWS;
 #ifdef __ANDROID__
-        option_row = option_row || (i >= 17 && i != 19);
+        option_row = option_row ||
+                     (i >= HM_VIRTUAL_GAMEPAD_ROW && i != HM_VIRTUAL_GAMEPAD_EDIT_ROW);
 #endif
         CHECK(hm_pause_handle(&menu, HM_PAUSE_RIGHT) ==
               (option_row ? HM_PAUSE_CHANGE_CONTROLS : HM_PAUSE_NONE));
         CHECK(hm_pause_handle(&menu, HM_PAUSE_LEFT) ==
               (option_row ? HM_PAUSE_CHANGE_CONTROLS : HM_PAUSE_NONE));
         hm_pause_action confirm = hm_pause_handle(&menu, HM_PAUSE_CONFIRM);
-        if (i < 3)
+        if (i < HM_CONTROLS_PRIMARY_ROWS)
             CHECK(confirm == HM_PAUSE_CHANGE_CONTROLS);
-        else if (i < 17)
+        else if (i < HM_KEYBOARD_BINDING_ROWS)
             CHECK(confirm == HM_PAUSE_REMAP_CONTROLS);
 #ifdef __ANDROID__
-        else if (i == 19)
+        else if (i == HM_VIRTUAL_GAMEPAD_EDIT_ROW)
             CHECK(confirm == HM_PAUSE_EDIT_TOUCH_LAYOUT);
         else
             CHECK(confirm == HM_PAUSE_CHANGE_CONTROLS);

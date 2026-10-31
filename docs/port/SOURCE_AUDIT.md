@@ -81,17 +81,13 @@ can also occur at camera clamp boundaries and is not itself proof of corruption.
 | Analyzer: name-entry/estate/grid/helper null paths | Estate pickup/boolean query null outputs resolved (ADR-067); name-entry/grid/helper callers still need individual validation |
 | Nine debug-font API traps and partial SDK modes | See API_COVERAGE.md; no full-SDK implementation claim |
 
-The matching check cannot run on this Windows host: the Linux matching toolchain
-is unavailable and the owner excludes WSL. New HMBTN_PORT branches retain exact
-original alternatives; textual reconstruction is not a matching compiler check.
-Release and ASan/UBSan now pass 106/106 tests without disc data. ADR-065/066 close
-the first batch's shop/family/transfer layout findings. Seven changed translation
-units passed targeted follow-up analysis without core/unix/security findings.
-An additional read-only fixture loaded all five family names from the validated
-owner BIN; it did not run gameplay or access saves. The original 928-byte transfer
-stash was separately reproduced as an ASan global-buffer-overflow.
-Remaining rows below still need individual caller/layout evidence; this batch
-does not establish complete gameplay coverage.
+Release and ASan/UBSan now pass 106/106 tests without disc data. ADR-065/066 close the
+first batch's shop/family/transfer layout findings. Seven changed translation units
+passed targeted follow-up analysis without core/unix/security findings. An additional
+read-only fixture loaded all five family names from the validated owner BIN; it did not
+run gameplay or access saves. The original 928-byte transfer stash was separately
+reproduced as an ASan global-buffer-overflow. Remaining rows below still need individual
+caller/layout evidence; this batch does not establish complete gameplay coverage.
 
 ## Third follow-up batch (ADR-067)
 

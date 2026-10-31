@@ -29,15 +29,6 @@ void hm_controls_defaults(hm_controls_options *opt) {
     opt->keyboard_layout = HM_KEYBOARD_LAYOUT_ARROWS;
     opt->virtual_gamepad_enabled = 1;
     opt->virtual_gamepad_size = 100;
-    /* PORT: On Android the primary input is touch, which SDL3 synthesises as
-     * left mouse clicks.  Default to ACTION mode so tapping inventory slots,
-     * dialogue choices, and storage grids works out-of-the-box without the
-     * user having to open the Settings menu first (ADR-135). */
-#ifdef __ANDROID__
-    opt->mouse_mode = HM_MOUSE_MODE_ACTION;
-#else
-    opt->mouse_mode = HM_MOUSE_MODE_OFF;
-#endif
     static const int defaults[16] = {
         SDL_SCANCODE_Q, SDL_SCANCODE_E, SDL_SCANCODE_A, SDL_SCANCODE_S,
         SDL_SCANCODE_W, SDL_SCANCODE_D, SDL_SCANCODE_X, SDL_SCANCODE_Z,
@@ -61,17 +52,11 @@ int hm_controls_change(hm_controls_options *opt, int item, int step) {
         else
             opt->keyboard_layout = (opt->keyboard_layout + 3) % 4;
         return 1;
-    case 2:
-        if (step > 0)
-            opt->mouse_mode = (opt->mouse_mode + 1) % 3;
-        else
-            opt->mouse_mode = (opt->mouse_mode + 2) % 3;
-        return 1;
 #ifdef __ANDROID__
-    case 17:
+    case HM_VIRTUAL_GAMEPAD_ROW:
         opt->virtual_gamepad_enabled = !opt->virtual_gamepad_enabled;
         return 1;
-    case 18: {
+    case HM_VIRTUAL_GAMEPAD_SIZE_ROW: {
         int size = opt->virtual_gamepad_size + (step > 0 ? 10 : -10);
         if (size < 70) size = 140;
         if (size > 140) size = 70;
@@ -116,30 +101,17 @@ void hm_controls_row_value(const hm_controls_options *opt, int item, char *out, 
             break;
         }
         break;
-    case 2:
-        switch (opt->mouse_mode) {
-        case HM_MOUSE_MODE_ACTION:
-            snprintf(out, size, "Action");
-            break;
-        case HM_MOUSE_MODE_MOVE:
-            snprintf(out, size, "Move-Act");
-            break;
-        default:
-            snprintf(out, size, "Off");
-            break;
-        }
-        break;
     default:
 #ifdef __ANDROID__
-        if (item == 17) {
+        if (item == HM_VIRTUAL_GAMEPAD_ROW) {
             snprintf(out, size, "%s", opt->virtual_gamepad_enabled ? "On" : "Off");
             break;
         }
-        if (item == 18) {
+        if (item == HM_VIRTUAL_GAMEPAD_SIZE_ROW) {
             snprintf(out, size, "%d%%", opt->virtual_gamepad_size);
             break;
         }
-        if (item == 19) {
+        if (item == HM_VIRTUAL_GAMEPAD_EDIT_ROW) {
             snprintf(out, size, "Adjust");
             break;
         }
@@ -150,8 +122,8 @@ void hm_controls_row_value(const hm_controls_options *opt, int item, char *out, 
             break;
         }
 #endif
-        if (item >= 3 && item < HM_KEYBOARD_BINDING_ROWS) {
-            int action = item - 3;
+        if (item >= HM_CONTROLS_PRIMARY_ROWS && item < HM_KEYBOARD_BINDING_ROWS) {
+            int action = item - HM_CONTROLS_PRIMARY_ROWS;
             int index = hm_keyboard_bind_indices[action];
             const char *name = SDL_GetScancodeName((SDL_Scancode)opt->keyboard_mapping[index]);
             snprintf(out, size, "%s", name && *name ? name : "None");
@@ -188,30 +160,17 @@ void hm_controls_value(const hm_controls_options *opt, int item, char *out, size
             break;
         }
         break;
-    case 2:
-        switch (opt->mouse_mode) {
-        case HM_MOUSE_MODE_ACTION:
-            snprintf(out, size, "Mouse Action and Tool mode");
-            break;
-        case HM_MOUSE_MODE_MOVE:
-            snprintf(out, size, "Mouse Move and Action mode");
-            break;
-        default:
-            snprintf(out, size, "Mouse input disabled");
-            break;
-        }
-        break;
     default:
 #ifdef __ANDROID__
-        if (item == 17) {
+        if (item == HM_VIRTUAL_GAMEPAD_ROW) {
             snprintf(out, size, "Show or hide the on-screen virtual gamepad");
             break;
         }
-        if (item == 18) {
+        if (item == HM_VIRTUAL_GAMEPAD_SIZE_ROW) {
             snprintf(out, size, "Adjust the screen button size");
             break;
         }
-        if (item == 19) {
+        if (item == HM_VIRTUAL_GAMEPAD_EDIT_ROW) {
             snprintf(out, size, "Drag buttons to move them, then tap Done");
             break;
         }
@@ -222,8 +181,9 @@ void hm_controls_value(const hm_controls_options *opt, int item, char *out, size
             break;
         }
 #endif
-        if (item >= 3 && item < HM_KEYBOARD_BINDING_ROWS)
-            snprintf(out, size, "Bind %s to a key", hm_keyboard_bind_labels[item - 3]);
+        if (item >= HM_CONTROLS_PRIMARY_ROWS && item < HM_KEYBOARD_BINDING_ROWS)
+            snprintf(out, size, "Bind %s to a key",
+                     hm_keyboard_bind_labels[item - HM_CONTROLS_PRIMARY_ROWS]);
         else
             out[0] = '\0';
         break;
@@ -265,14 +225,6 @@ int hm_controls_load(hm_controls_options *opt) {
                 value >= SDL_SCANCODE_UNKNOWN && value < SDL_SCANCODE_COUNT)
                 opt->keyboard_mapping[i] = value;
         }
-        if (hm_json_property(object, length, "mouse", &val, &val_len) == 1) {
-            if (val_len == 8 && !memcmp(val, "\"action\"", 8))
-                opt->mouse_mode = HM_MOUSE_MODE_ACTION;
-            else if (val_len == 6 && !memcmp(val, "\"move\"", 6))
-                opt->mouse_mode = HM_MOUSE_MODE_MOVE;
-            else
-                opt->mouse_mode = HM_MOUSE_MODE_OFF;
-        }
 #ifdef __ANDROID__
         if (hm_json_property(object, length, "virtual_gamepad", &val, &val_len) == 1)
             opt->virtual_gamepad_enabled = (val_len == 4 && !memcmp(val, "true", 4));
@@ -302,9 +254,6 @@ int hm_controls_save(const hm_controls_options *opt) {
                          ((opt->keyboard_layout == HM_KEYBOARD_LAYOUT_OFF) ? "\"off\"" :
                          ((opt->keyboard_layout == HM_KEYBOARD_LAYOUT_CUSTOM) ? "\"custom\"" : "\"arrows\""));
     ok &= hm_user_data_set_nested_setting("controls", "keyboard", kb_val);
-    const char *m_val = (opt->mouse_mode == HM_MOUSE_MODE_ACTION) ? "\"action\"" :
-                        ((opt->mouse_mode == HM_MOUSE_MODE_MOVE) ? "\"move\"" : "\"off\"");
-    ok &= hm_user_data_set_nested_setting("controls", "mouse", m_val);
 #ifdef __ANDROID__
     ok &= hm_user_data_set_nested_setting("controls", "virtual_gamepad",
                                           opt->virtual_gamepad_enabled ? "true" : "false");
@@ -330,7 +279,7 @@ int hm_controls_save(const hm_controls_options *opt) {
 }
 
 int hm_controls_bind(hm_controls_options *opt, int item, int scancode) {
-    if (!opt || item < 3 || item >= HM_KEYBOARD_BINDING_ROWS ||
+    if (!opt || item < HM_CONTROLS_PRIMARY_ROWS || item >= HM_KEYBOARD_BINDING_ROWS ||
         scancode <= SDL_SCANCODE_UNKNOWN || scancode >= SDL_SCANCODE_COUNT)
         return 0;
 #ifdef __ANDROID__
@@ -339,7 +288,7 @@ int hm_controls_bind(hm_controls_options *opt, int item, int scancode) {
         scancode == SDL_SCANCODE_PRINTSCREEN || scancode == SDL_SCANCODE_SCROLLLOCK)
         return 0;
 #endif
-    int index = hm_keyboard_bind_indices[item - 3];
+    int index = hm_keyboard_bind_indices[item - HM_CONTROLS_PRIMARY_ROWS];
     for (int i = 0; i < HM_KEYBOARD_ACTIONS; ++i) {
         int other = hm_keyboard_bind_indices[i];
         if (other != index && opt->keyboard_mapping[other] == scancode)

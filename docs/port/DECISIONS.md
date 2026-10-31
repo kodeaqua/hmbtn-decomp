@@ -25,9 +25,9 @@ Context: The original roadmap starts native bring-up on Linux. The owner asked
 to prioritize Windows during Phase 0.
 
 Decision: Bring up Windows x86-64 first, using project-local checksum-pinned
-LLVM-mingw/UCRT, CMake and Ninja. Windows port builds must not depend on WSL,
-a PSX SDK, or the matching toolchain. Retain the other desktop foundation
-presets for later validation. Matching validation retains its Linux requirement.
+LLVM-mingw/UCRT, CMake and Ninja. Windows port builds must not depend on WSL, a PSX SDK,
+or the matching toolchain. Retain the other desktop foundation presets for later
+validation.
 
 Consequences: The first game boot target is now Windows. Android is deferred.
 No renderer or runtime architecture decision changes. Release links use static
@@ -52,13 +52,11 @@ Date: 2026-10-25. Status: accepted by explicit owner instruction.
 
 Context: The owner does not want WSL used for this work.
 
-Decision: Build and validate the port with native Windows tools. Do not install,
-invoke, or require WSL. Defer matching validation to a separate Linux host when
-available, preserving the requirement to report an unverified matching baseline.
+Decision: Build and validate the port with native Windows tools. Do not install, invoke,
+or require WSL.
 
-Consequences: An unavailable Linux matching toolchain does not block Windows
-port progress. Matching source protection and honest validation reports remain
-required. No claim of a successful matching check follows from Windows tests.
+Consequences: An unavailable Linux matching toolchain does not block Windows port
+progress.
 
 ## ADR-005: Upgrade the Windows compiler for sanitizer startup
 
@@ -150,11 +148,10 @@ callers that assign that pointer to 32-bit integers must fail compilation until
 ported. The matching branches retain their original declarations and statements.
 No save-format or asset-pointer compatibility is implied by this workspace.
 
-Consequences: Frame/farm memory can be tested independently of GPU execution
-and disc IO. Free-space budgets and demo overlap retain their vanilla meaning.
-OT pointer encoding, overlay loading, asset bounds validation and the rest of
-boot remain separate work. Matching check still requires an unavailable Linux
-toolchain; textual branch preservation is additional evidence, not a substitute.
+Consequences: Frame/farm memory can be tested independently of GPU execution and disc
+IO. Free-space budgets and demo overlap retain their vanilla meaning. OT pointer
+encoding, overlay loading, asset bounds validation and the rest of boot remain separate
+work.
 
 <a id="adr-009"></a>
 
@@ -289,15 +286,12 @@ Do not apply this pattern to captured-local helpers without explicit arguments.
 A regression test compares original and adapter tokens, excluding only static
 and whitespace/comments. Existing unusual comparisons remain unchanged.
 
-Consequences: Eleven capture-free helpers in ground collision, animal headings,
-estate items, shop rows, winter event conditions, scene visibility, minigame 2
-and debug screen storage now compile under Clang.
-Data-free tests exercise winding/edge/height geometry, comparison boundaries,
-estate flag priority and visible medal rows. These do not prove full gameplay
-parity. The native helper copies must remain synchronized with matching source.
-The matching compiler check remains unavailable on the Windows-only host;
-reconstructing exact matching text provides additional evidence, not a binary
-matching result. No compiler switch or new runtime dependency is introduced.
+Consequences: Eleven capture-free helpers in ground collision, animal headings, estate
+items, shop rows, winter event conditions, scene visibility, minigame 2 and debug screen
+storage now compile under Clang. Data-free tests exercise winding/edge/height geometry,
+comparison boundaries, estate flag priority and visible medal rows. These do not prove
+full gameplay parity. The native helper copies must remain synchronized with matching
+source. No compiler switch or new runtime dependency is introduced.
 
 The harvest carry helper captures its enclosing object. Its native adapter
 receives that object explicitly; a call macro passes the current object and is
@@ -450,14 +444,12 @@ TitleImage assignment crosses into neighboring matching globals. All three
 pictures are smaller than the destination. Native global placement and ASan
 redzones cannot reproduce that incidental adjacency.
 
-Decision: A narrow HMBTN_PORT branch selects the same random picture once and
-copies its declared complete bytes. Leave the destination tail untouched; it
-is outside that picture's compressed asset. The original assignment remains
-in the matching else branch. This avoids reading unrelated native globals
-without modifying the asset or suppressing ASan. No visual parity is claimed
-until the loading-picture decoder and screen are exercised. Matching check is
-unavailable on this Windows-only host; textual else reconstruction is separate
-evidence, not a matching build result.
+Decision: A narrow HMBTN_PORT branch selects the same random picture once and copies its
+declared complete bytes. Leave the destination tail untouched; it is outside that
+picture's compressed asset. The original assignment remains in the matching else branch.
+This avoids reading unrelated native globals without modifying the asset or suppressing
+ASan. No visual parity is claimed until the loading-picture decoder and screen are
+exercised.
 
 <a id="adr-021"></a>
 
@@ -600,15 +592,13 @@ and https://psx-spx.consoledev.net/dev/ps1/gpu/render-line-commands/.
 
 Date: 2026-10-25. Status: accepted for pointer safety.
 
-ASan New Game replay reports an access violation in name_title_build_label.
-LOCALIZED casts an actual text-member pointer to u32 before adding a relocation
-delta; LOCALIZED_NAME and NAME_OFFSET have the same hazard. A port-only include
-uses full native addresses and the compiler's constant offsetof builtin. Keep
-the bank-start fields as 32-bit relocation metadata and retain original macros
-in matching else branches. Tests cover identity, relocation deltas and the
-12-byte metadata layout. The replay subsequently passes name/birthday setup
-and reaches farm initialization. Matching check is unavailable on Windows;
-textual reconstruction is separately checked against 9ace470.
+ASan New Game replay reports an access violation in name_title_build_label. LOCALIZED
+casts an actual text-member pointer to u32 before adding a relocation delta;
+LOCALIZED_NAME and NAME_OFFSET have the same hazard. A port-only include uses full
+native addresses and the compiler's constant offsetof builtin. Keep the bank-start
+fields as 32-bit relocation metadata and retain original macros in matching else
+branches. Tests cover identity, relocation deltas and the 12-byte metadata layout. The
+replay subsequently passes name/birthday setup and reaches farm initialization.
 
 <a id="adr-027"></a>
 
@@ -700,14 +690,12 @@ loaded. farm_state_init clears farm_area.mode.data. The two previous-mine
 override checks dereference that null pointer before scene_enter loads the
 first area's data. ASan/UBSan identifies the first dereference on Windows.
 
-For native builds, apply those overrides only when previous-area data exists.
-Leave the loaded-area path and original matching conditions unchanged. Do not
-map address zero or simulate PS1 RAM. A test calls the original selection
-function with no previous area, a house upgrade/season, and loaded mine flags.
-The contents read at address zero on original hardware are not established;
-this adaptation does not prove first-entry hardware parity. Matching check
-remains unavailable on this Windows-only host; source-branch reconstruction
-against 9ace470 passes for all 59 guards in 26 files.
+For native builds, apply those overrides only when previous-area data exists. Leave the
+loaded-area path and original matching conditions unchanged. Do not map address zero or
+simulate PS1 RAM. A test calls the original selection function with no previous area, a
+house upgrade/season, and loaded mine flags. The contents read at address zero on
+original hardware are not established; this adaptation does not prove first-entry
+hardware parity.
 
 <a id="adr-032"></a>
 
@@ -1060,15 +1048,13 @@ Correct the native existence completion from its previous opaque value 2 to 1;
 otherwise the menu stays busy even after a successful existence query.
 
 An isolated test includes the original save/load implementation. Its bounded
-asynchronous asset fixture completes only after two real native VSync ticks,
-and fails quickly if the original busy polling returns. Rendering sinks capture
-the expected texture and five sprite bindings without parsing game assets.
-The test also runs save_reset_state, verifies the contiguous image slices,
-and exercises the original probe/poll helpers on both synthetic ordinary cards.
-Storage regressions verify the existence completion ID. No real save files,
-gameplay session or owner Documents directory is accessed by these tests.
-In-game confirmation remains with the owner. Matching check is unavailable on
-this native Windows host; text reconstruction of matching branches is separate.
+asynchronous asset fixture completes only after two real native VSync ticks, and fails
+quickly if the original busy polling returns. Rendering sinks capture the expected
+texture and five sprite bindings without parsing game assets. The test also runs
+save_reset_state, verifies the contiguous image slices, and exercises the original
+probe/poll helpers on both synthetic ordinary cards. Storage regressions verify the
+existence completion ID. No real save files, gameplay session or owner Documents
+directory is accessed by these tests. In-game confirmation remains with the owner.
 
 <a id="adr-046"></a>
 
@@ -1084,12 +1070,10 @@ Keep the original callbacks and use native adapters with the exact dispatcher
 signature, explicitly narrowing coordinates as the original callbacks do.
 Do not suppress function-type sanitization or change matching callback selection.
 
-A regression calls both original public background modes twice, including
-the fourth-call scroll increment. Capturing drawing sinks check all 165 tiles
-per call, frame sequence, negative coordinates, animation binding and current
-frame primitive-cursor pointers. No actual asset or window is used. The original
-matching branches reconstruct exactly; the matching compiler check itself
-remains unverified because its Linux toolchain is unavailable here.
+A regression calls both original public background modes twice, including the
+fourth-call scroll increment. Capturing drawing sinks check all 165 tiles per call,
+frame sequence, negative coordinates, animation binding and current frame
+primitive-cursor pointers. No actual asset or window is used.
 
 <a id="adr-047"></a>
 
@@ -1121,12 +1105,11 @@ reject reentry; their state inventories are not silently assumed complete.
 This supersedes ADR-017's reentry restriction only for title and save/load.
 
 Tests mutate actual private title counters, callback, arrays, native pointers and
-initialized tables and verify five restorations. The save/load fixture verifies
-four restorations including its complete workspace and animation pointer. A
-separate integration unit registers both real inventories, alternates their
-selections six times and checks resident game state survives. No game loop,
-window, disc or interactive replay is started. Matching check remains unavailable
-on this native Windows host; matching-branch text reconstruction is separate.
+initialized tables and verify five restorations. The save/load fixture verifies four
+restorations including its complete workspace and animation pointer. A separate
+integration unit registers both real inventories, alternates their selections six times
+and checks resident game state survives. No game loop, window, disc or interactive
+replay is started.
 
 <a id="adr-048"></a>
 
@@ -1260,13 +1243,13 @@ pause or menu flags. Unmatched primitives keep current geometry, so coverage
 and cadence depend on stable native command allocation. This is an experimental
 screen-space heuristic, not persistent actor/world-space interpolation.
 
-The OFF path has no capture allocation or packet changes. Synthetic tests cover
-midpoint geometry, current UI, context restoration and history rejection;
-release and ASan/UBSan pass. Compile-time OFF still links the native executable.
-Full gameplay, native image parity, input latency and actual frame cost require
-owner validation. No new dependencies, assets, threads or matching guards.
-See port/enhance/interpolation/README.md for limits and PLATFORMS.md for the
-explicitly synthetic lower-bound replay measurement.
+The OFF path has no capture allocation or packet changes. Synthetic tests cover midpoint
+geometry, current UI, context restoration and history rejection; release and ASan/UBSan
+pass. Compile-time OFF still links the native executable. Full gameplay, native image
+parity, input latency and actual frame cost require owner validation. No new
+dependencies, assets, threads or matching guards. See
+port/enhance/interpolation/README.md for limits and PLATFORMS.md for the explicitly
+synthetic lower-bound replay measurement.
 
 <a id="adr-051"></a>
 
@@ -1510,11 +1493,10 @@ at 1080p can be expensive. No full-game parity or high-FPS claim is made.
 
 Validation: Release and ASan/UBSan unit suites; Vulkan/D3D12 offscreen world/UI,
 texture-filtering, fade and both framebuffer-origin comparisons. Exact native
-comparisons and 9/255 enlarged color tolerance. GS cursor/OFF arena preservation
-and unchanged native projection are covered by unit tests. A mechanical check
-removing only the new guards reconstructs each original source file exactly.
-Matching check could not run: the matching Linux toolchain is unavailable on
-this Windows host and the owner prohibits WSL. No matching result is claimed.
+comparisons and 9/255 enlarged color tolerance. GS cursor/OFF arena preservation and
+unchanged native projection are covered by unit tests. A mechanical check removing only
+the new guards reconstructs each original source file exactly. No matching result is
+claimed.
 
 ## ADR-057: Stable widescreen presentation across every screen and fallback
 
@@ -1587,11 +1569,10 @@ animation-pointer tails, rather than the PS1-sized 0xB0 prefix. The original
 else branches remain exact. Candidate filtering, table order, held/event/place
 rules and random-call cadence stay unchanged.
 
-Validation: The original synthetic empty-table call crashes; the repaired call
-passes ASan/UBSan. Tests cover no candidates/no RNG advance, the final livestock
-and chicken slots, held/event/location exclusions and full action clearing.
-Actual sleeping/overnight gameplay remains owner-tested. Matching check cannot
-run on this host: its Linux toolchain is unavailable and WSL is prohibited.
+Validation: The original synthetic empty-table call crashes; the repaired call passes
+ASan/UBSan. Tests cover no candidates/no RNG advance, the final livestock and chicken
+slots, held/event/location exclusions and full action clearing. Actual
+sleeping/overnight gameplay remains owner-tested.
 
 ## ADR-059: Fixed save payload independent of native object layout
 
@@ -1648,11 +1629,9 @@ and advances VSync(0), one hardware tick, until ready. No background game thread
 host-time logic step or arbitrary timeout is introduced. Original else branches
 remain exact. These add one player guard and two clock_events guards.
 
-Validation: Dialogue fixture covers confirmation, no confirmation and blocked
-targets. Loader fixture requires three hardware ticks and verifies that an
-already-ready loader advances none. Interactive dialogue and overnight completion
-remain owner-tested. Matching check could not run without the Linux toolchain;
-the owner excludes WSL.
+Validation: Dialogue fixture covers confirmation, no confirmation and blocked targets.
+Loader fixture requires three hardware ticks and verifies that an already-ready loader
+advances none. Interactive dialogue and overnight completion remain owner-tested.
 
 ## ADR-061: Explicit SDK coverage instead of success stubs
 
@@ -1749,15 +1728,13 @@ adapter adds VSync(0) after an unfinished afile poll; initial/completed reads an
 all ordinary game asynchronous reads keep their timing. No fake assets, callback
 results or broad source reformatting are introduced.
 
-Validation: The old villager copier fails the new fixture; the fixed helper
-preserves all fields outside the copied animations across 37 records and checks
-the conditional reload path. Tests cover all gift bit positions/rows and remapped
-reaction classes, native chicken tails, coin/berry use and bounded pending asset
-polls. Release and ASan/UBSan each pass 94 tests. See SOURCE_AUDIT.md for exact
-coverage, open findings and the limits of static analysis. The reported NPC and
-camera behavior still need owner testing. Matching check is unavailable because
-the Linux toolchain is absent and WSL is prohibited; disabled new source branches
-are checked textually instead.
+Validation: The old villager copier fails the new fixture; the fixed helper preserves
+all fields outside the copied animations across 37 records and checks the conditional
+reload path. Tests cover all gift bit positions/rows and remapped reaction classes,
+native chicken tails, coin/berry use and bounded pending asset polls. Release and
+ASan/UBSan each pass 94 tests. See SOURCE_AUDIT.md for exact coverage, open findings and
+the limits of static analysis. The reported NPC and camera behavior still need owner
+testing.
 
 ## ADR-065: Explicit shop callback indexing and original family text
 
@@ -1786,14 +1763,12 @@ strings, disc content or SDK material are copied into source control. Missing or
 malformed text fails initialization clearly; invalid wife indices fail explicitly.
 
 Validation: Synthetic ISO fixtures check all five native pointers, terminators,
-range/I/O/malformed-data failures and lookup through the game entry point. An
-isolated read-only check also loaded all five names from the owner's SHA-1-validated
-BIN; it did not execute gameplay. Shop tests exercise the highest request, the
-null slot, the shared initializer, zero request, invalid ID rejection and basket
-pending/completed behavior. Matching check is unavailable on this Windows host
-without the Linux toolchain; WSL is excluded. Disabled new guards reconstruct the
-original sources exactly. No other platform/device or married-status gameplay
-claim follows from these checks.
+range/I/O/malformed-data failures and lookup through the game entry point. An isolated
+read-only check also loaded all five names from the owner's SHA-1-validated BIN; it did
+not execute gameplay. Shop tests exercise the highest request, the null slot, the shared
+initializer, zero request, invalid ID rejection and basket pending/completed behavior.
+Disabled new guards reconstruct the original sources exactly. No other platform/device
+or married-status gameplay claim follows from these checks.
 
 ## ADR-066: Separate partner save bytes from native transfer records
 
@@ -1816,16 +1791,14 @@ words and preserving every subsequent partner payload byte. Native view state
 joins the save overlay's reset inventory. Keep original source alternatives.
 
 Validation: Real source staging/restoration fixtures exchange five cows and five
-chickens using synthetic farms and an in-memory payload. They cover final record
-slots, stash capacity/reset, full native tail restoration, metadata/identity,
-short-input rejection, unchanged non-animal bytes and original shift/checksum
-round trips. No owner saves are opened or written. Release and ASan/UBSan each
-pass 99/99 tests; seven changed translation units pass targeted Clang analysis
-without core/unix/security findings. These checks do not establish interactive
-card failure/abort/retry behavior, original-PS1 interchange or full-game parity.
-The original exchange transaction/error policy is unchanged; no atomic-write or
-rollback guarantee is introduced. Matching check remains unavailable (no Linux
-toolchain, no WSL); textual source reconstruction is a separate check.
+chickens using synthetic farms and an in-memory payload. They cover final record slots,
+stash capacity/reset, full native tail restoration, metadata/identity, short-input
+rejection, unchanged non-animal bytes and original shift/checksum round trips. No owner
+saves are opened or written. Release and ASan/UBSan each pass 99/99 tests; seven changed
+translation units pass targeted Clang analysis without core/unix/security findings.
+These checks do not establish interactive card failure/abort/retry behavior,
+original-PS1 interchange or full-game parity. The original exchange transaction/error
+policy is unchanged; no atomic-write or rollback guarantee is introduced.
 
 ## ADR-067: Optional probe outputs, pointer sentinels and native frame callbacks
 
@@ -1870,12 +1843,10 @@ sequence pointer is never dereferenced and is not a claim about real allocations
 or audible music. MG1's waiting-screen behavior has compile/analyzer validation,
 not an interactive minigame test.
 
-Windows Release and ASan/UBSan each pass 106/106 tests. Targeted Clang analysis
-of six modified game units reports no core/unix/security findings or the selected
-callback/return/pointer-cast warnings. No gameplay/replay or owner save data is
-used. Matching check cannot run without the separate Linux toolchain (WSL is
-excluded); disabled native guards are checked textually instead. No full-game,
-other-platform or performance claim follows from this batch.
+Windows Release and ASan/UBSan each pass 106/106 tests. Targeted Clang analysis of six
+modified game units reports no core/unix/security findings or the selected
+callback/return/pointer-cast warnings. No gameplay/replay or owner save data is used. No
+full-game, other-platform or performance claim follows from this batch.
 
 ## ADR-068: Wide transition capture, full-screen tiles and scanout canvas
 
@@ -1933,13 +1904,12 @@ sprite accesses in two draw helpers. Keep all original matching expressions in
 exact #else alternatives. Do not enlarge the array and duplicate the shared
 cursor/mark state used elsewhere.
 
-Validation: The original loader runs in a synthetic bounded fixture, checking
-two hardware/host ticks, one read, one texture upload, five exact native bindings
-and the copied pack. The fixture neither runs gameplay nor uses disc/save data.
-Release and ASan/UBSan each pass 107 tests. Original source reconstruction with
-HMBTN_PORT disabled matches HEAD before the repair exactly. Matching check is
-unavailable without the separate Linux toolchain; WSL is excluded. Interactive
-summary-page navigation remains owner-tested.
+Validation: The original loader runs in a synthetic bounded fixture, checking two
+hardware/host ticks, one read, one texture upload, five exact native bindings and the
+copied pack. The fixture neither runs gameplay nor uses disc/save data. Release and
+ASan/UBSan each pass 107 tests. Original source reconstruction with HMBTN_PORT disabled
+matches HEAD before the repair exactly. Interactive summary-page navigation remains
+owner-tested.
 
 ## ADR-070: Original splash clear colour and displayed-buffer identity
 
@@ -2245,7 +2215,10 @@ Decision: Add enhance/gameplay and platform/gameplay_options, gated by
 HMBTN_ENH_GAMEPLAY (enabled in Windows build.ps1 -Game; runtime defaults OFF except
 wild_dog=1 for vanilla parity). Keep options saved in settings.json under "gameplay".
 When Walk through crops is enabled, field crops and wild/dead weeds stay passable
-without clearing their pickup/harvest flags, so they remain interactable while walking.
+without clearing their pickup/harvest flags. The player's movement-only collision
+probe marks its actor identity so the tile callback can skip only crop/weed hits;
+it still checks the other obstacles and actors. Tool-target probes keep their
+normal tile results, and the separate sprint-step probe follows the same option.
 When splitting or moving stacked items in the rucksack menu, show the native-style
 quantity selector dialog with D-pad input (+-1, +-10) and item preview. Draw connected
 fences as two-tiered shaded wooden rails with highlight/shadow behind the posts.
@@ -3107,10 +3080,8 @@ incorrect reads and writes on LP64 hosts, including writes beyond VECTOR.
 Decision: Under HMBTN_PORT use `s32 *` for these component pointers. Keep the
 matching declarations unchanged. Add a camera basis regression test.
 
-Consequences: Camera construction and ground checks use the intended 32-bit
-stride on Android and other LP64 hosts. Actual Android gameplay remains to be
-validated on a device; the separate Linux matching check is not available on
-this Windows host.
+Consequences: Camera construction and ground checks use the intended 32-bit stride on
+Android and other LP64 hosts.
 
 <a id="adr-111"></a>
 
@@ -4293,23 +4264,47 @@ and event-schedule behavior remains owner-tested.
 Date: 2026-10-31. Status: accepted.
 
 Context: The owner requested a shipping-bin screen using the game's window and
-font assets, with the rucksack above shipped items, and a way to reclaim an item
-before the 5:00/Zack settlement while preserving the existing throw action.
+font assets, and a way to reclaim an item before the 5:00/Zack settlement while
+preserving the existing throw action. The owner later asked to remove the
+rucksack panel and keep one shipped-items window.
 
-Decision: When the player faces a shipping box with an empty hand, presses X,
-and settlement has not happened, open the original framed pause-style dialog.
-The top panel lists all rucksack slots; the lower panel lists shipped item
-variants and quantities. Confirming a row first validates rucksack capacity,
-then returns one item and reverses the shipment count, value, and fish tally.
-When an item is held, the original throw-to-bin action continues unchanged.
-The list closes at settlement and is cleared on the next clock reset.
+Decision: When the player presses X with an empty hand near any
+`ZONE_SHIPPING_BOX`, open the original framed pause-style dialog. Search all
+active shipping-box zones within one farm tile of the player, so facing and
+overlapping zones cannot hide the bin. Some outdoor farm area data omit this
+zone, so also resolve a nearby morphing, slotted scene model in front of the
+player on the outdoor farm map. The window lists shipped item variants and
+quantities. Confirming an item first validates rucksack capacity, then returns
+one item and reverses the
+shipment count, value, and fish tally. Holding an item at a fixed shipping box
+keeps the original throw action. When Shipping Bin List is enabled and the
+player holds the portable basket, pressing Square opens the same list with a
+`Ship basket now` row; choosing it starts the original animated basket shipment.
+The screen does not replace the coop/barn feed or product-processing stations,
+which retain their original interactions.
+
+The screen uses one original-style frame with native 32-pixel item sprites in
+the original 4-by-2 grid. The host copies each requested sprite into a private VRAM
+context while drawing icons, then restores the live picture-slot tables and VRAM. The
+shipped-item grid navigates by D-pad or touch selection. A thrown stack carries
+its quantity through the flight and records every unit in both the normal bin
+landing path and the supplemental proximity path. Items that lack a vanilla
+shipment-count slot (such as bamboo shoots) are tracked by the feature's
+session-only variant counts; portable-basket additions are committed to those
+counts when the basket is shipped. The footer uses Cross/Circle marks instead
+of spelling out those button names.
 
 Consequences: An item can be reclaimed only before settlement, and a full
-rucksack leaves shipment state unchanged. Exact variant tracking is kept in
-process memory because the feature does not alter the vanilla save/card format;
-the item-variant list is therefore not restored after restarting or loading a
-save. Windows and Android `-Game` builds include the option, which defaults OFF.
-The owner must verify bin interaction and original throw behavior in gameplay.
+rucksack leaves shipment state unchanged. The setting defaults OFF, so enable
+Shipping Bin List in Pause > Settings > Gameplay to open the list. Counts are
+tracked during the day even while the option is off, and become visible if it
+is enabled before settlement. Exact variant tracking is kept in process memory
+because the feature does not alter the vanilla save/card format; the
+item-variant list is therefore not restored after restarting or loading a save.
+Windows and Android `-Game` builds include the option. The owner must verify bin
+interaction and original throw behavior in gameplay. The shipped-item view draws
+eight slots per page; D-pad/tap selects a slot, confirm takes one item,
+and back closes the view.
 
 ## ADR-161: Remap Keyboard and Android Touch Controls
 
@@ -4323,7 +4318,10 @@ Decision: Add per-action keyboard capture with duplicate-key rejection. On
 Android, provide a virtual-pad enable switch, action mapping for each on-screen
 button, size choices from 70% to 140%, and an edit mode that saves normalized
 button positions. Keep virtual-pad actions on dedicated reserved SDL key codes
-so disabling keyboard input does not disable touch controls.
+so disabling keyboard input does not disable touch controls. Map the virtual
+stick to the game's eight-way D-pad with an 8 dp deadzone and angle hysteresis.
+Press a new direction before releasing the old one so axis changes do not emit
+a neutral movement interval.
 
 Consequences: Keyboard and Android layout settings persist in user settings,
 not game saves. The Android layout editor provides Reset and Done controls.
@@ -4382,3 +4380,94 @@ reducing compute and memory bandwidth on mobile GPUs. The Windows scaling option
 is unchanged. Android image sharpness and performance should be checked on the
 owner's tablet and Adreno device; agents must not claim a measured improvement
 without device timings.
+
+## ADR-165: Avoid Bilinear Texture Sampling in Android GPU Scenes
+
+Date: 2026-10-31. Status: accepted.
+
+Context: After the native-resolution rollback, the connected Adreno 610 still
+reported 12-13 presents/s at a 520x240 scene size. Present time averaged
+64-70 ms, with 60-66 ms in GPU submit, while CPU scene construction averaged
+1.4-1.6 ms. The GPU was busy about 99.9% of the sample and thermal status was
+normal. Android's CPU reference path already uses nearest texture sampling for
+bilinear mode, but the GPU scene path still used four bilinear texture taps.
+
+Decision: Apply the same mobile scene-filter policy to the GPU path: Android
+uses nearest texture sampling for Bilinear mode and retains xBR when explicitly
+selected. The final presentation blit still honors the profile's bilinear
+setting. Desktop GPU filtering is unchanged.
+
+Consequences: This removes the per-primitive four-tap filter cost from Android
+GPU scenes and keeps GPU/CPU mobile scene sampling aligned. Performance after
+this change must be measured on the Adreno device; no improvement is claimed
+from the pre-change sample.
+
+## ADR-166: Cache Tile Primitive Packets per GPU Workgroup
+
+Date: 2026-10-31. Status: accepted.
+
+Context: Android GPU submit remained the suspected bottleneck in dense farm
+scenes. Each output pixel repeatedly loaded the same tile's primitive IDs and
+primitive records from the global scene buffer.
+
+Decision: For native-size scenes whose dimensions align to the 8x8 bin grid,
+load a tile's primitive IDs and records once into workgroup-shared memory when
+the bin contains at most 16 primitives. Pixels in that workgroup then reuse
+the cached data. Scaled or partial workgroups, and bins above that limit, keep
+using the existing global-buffer path.
+
+Consequences: The shared cache reduces repeated scene-buffer reads for eligible
+tiles without changing bin order or the CPU fallback. Windows D3D12/Vulkan
+renderer probes pass their pixel comparisons and primitive coverage checks.
+The Android Release APK builds and runs on the owner's Helio G100 tablet; a
+single farm log sample measured 3.57 ms average game time and 3.99 ms average
+presentation, and the owner reports smooth play. This is not a controlled
+before/after benchmark. A later Adreno 610 farm capture is recorded in
+GPU_TESTING.md; the cache path covered nearly every tile, but submit time
+remained 36.4-43.5 ms and presentation 40.6-48.3 ms.
+
+## ADR-167: Skip Shared-Memory Barriers for Uncached Tile Bins
+
+Date: 2026-10-31. Status: accepted.
+
+Context: The workgroup packet cache is used only for non-empty bins containing
+at most 16 primitives. Empty bins and denser bins still paid a second
+workgroup-wide synchronization even though they did not write shared packet
+data.
+
+Decision: Enable packet caching only for counts from 1 through 16. Keep the
+initial barrier that publishes tile metadata, and perform the later ID/packet
+barriers only inside the group-uniform cache branch. The Android performance
+log also reports cache-eligible, empty, and uncached bin counts for each scene.
+
+Consequences: Empty and dense bins avoid the unused synchronization path while
+cached bins keep the barriers required for safe shared-memory reads. Windows
+Release and ASan/UBSan CTest each pass 125/125; the D3D12/Vulkan scene readback
+probes pass. Android Release builds with NDK 30.0.16248370. The APK was
+installed on Adreno 610 and tested in the farm. Since the scene had no empty
+bins and only 14 of 1,950 bins were too dense for caching, this barrier change
+affected a small part of that workload; the farm bottleneck remains. See
+GPU_TESTING.md for timings and limits.
+
+## ADR-168: Remove Gameplay Mouse Controls and Improve Pause Navigation
+
+Date: 2026-10-31. Status: accepted owner request.
+
+Context: Mouse movement/action controls were already disabled in the game host,
+but the Controls page still exposed and saved the no-op modes. Configured Android
+virtual-gamepad mappings were also not consumed by the pause loop.
+
+Decision: Remove the gameplay mouse-mode setting and all gameplay pointer
+position/button/wheel forwarding. Keep mouse/touch pointer interaction for
+pause-menu navigation only. Use the existing Esc/J, Circle, and Android Back
+routes for backing out of pages. Add platform-specific input hints and honor
+configured Android virtual-gamepad keys while the pause loop is active. Windows
+keeps keyboard, gamepad, and mouse navigation.
+
+Consequences: Old `controls.mouse` settings are ignored. Gameplay input remains
+keyboard/gamepad/touch-overlay based; pointer taps continue to work in pause
+menus. Back navigation uses existing keyboard, controller, and Android system
+Back inputs without adding a separate on-screen button. The pause UI still uses
+the existing original-game dialog art and font. Windows and Android builds and
+their controls/pause tests must verify the renumbered settings rows and
+touch/gamepad routes.

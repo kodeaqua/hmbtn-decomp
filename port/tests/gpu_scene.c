@@ -71,6 +71,21 @@ int main(void) {
           scanout.words[4] == 32 && scanout.words[5] == 32);
     CHECK(!memcmp(&saved_environment, hm_gpu_environment_state(), sizeof(saved_environment)));
     CHECK(scanout.vram_pixels[240 * HM_VRAM_WIDTH + 17] == hm_vram_pixel(17, 240));
+    /* Native aligned scenes report exactly which bins use workgroup cache. */
+    const RECT cache_area = {0, 0, 32, 32};
+    const u32 cache_rectangle[] = {0x600000ff, 0x00020002, 0x00040004};
+    hm_replay_sink cache_previous = hm_gpu_scene_begin(s, 32, 32);
+    hm_replay_begin(&cache_area);
+    hm_gpu_execute_words(cache_rectangle, 3);
+    hm_gpu_scene_data cache_data;
+    CHECK(hm_gpu_scene_end(s, cache_previous, &cache_data));
+    CHECK(cache_data.tile_count == 16 && cache_data.empty_bin_count == 15 &&
+          cache_data.shared_cache_bin_count == 1);
+    cache_previous = hm_gpu_scene_begin(s, 64, 64);
+    hm_replay_begin(&cache_area);
+    hm_gpu_execute_words(cache_rectangle, 3);
+    CHECK(hm_gpu_scene_end(s, cache_previous, &cache_data));
+    CHECK(cache_data.shared_cache_bin_count == 0);
     /* Audit every render-producing primitive opcode and documented NOP mirror. */
     u32 packet[32] = {0};
     for (u32 opcode = 0x20; opcode <= 0x3f; ++opcode) {

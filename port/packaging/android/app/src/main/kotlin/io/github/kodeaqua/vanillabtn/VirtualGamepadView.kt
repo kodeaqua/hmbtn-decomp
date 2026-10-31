@@ -105,7 +105,7 @@ class VirtualGamepadView(context: Context, private val userDataDir: File) : View
     private var stickKnobX = 0f
     private var stickKnobY = 0f
     private val maxStickRadius get() = 55f * density * gamepadScale
-    private val deadzoneRadius get() = 14f * density * gamepadScale
+    private val deadzoneRadius get() = 8f * density * gamepadScale
     private val baseCircleRadius get() = 55f * density * gamepadScale
     private val knobRadius get() = 26f * density * gamepadScale
     private var activeDpadUp = false
@@ -141,7 +141,6 @@ class VirtualGamepadView(context: Context, private val userDataDir: File) : View
         PadButton("SELECT", 12, virtualKeyCodes[12], isRect = true),
         PadButton("START", 13, virtualKeyCodes[13], isRect = true)
     )
-
     init {
         setWillNotDraw(false)
         loadButtonLayout()
@@ -308,8 +307,8 @@ class VirtualGamepadView(context: Context, private val userDataDir: File) : View
                     val left = when (btn.controlIndex) {
                         8 -> pad
                         10 -> pad + rw + gap
-                        11 -> w - pad - rw - gap
-                        else -> w - pad - rw
+                        9 -> w - pad - rw
+                        else -> w - pad - rw * 2f - gap
                     }
                     btn.rect.set(left, 16f * density, left + rw, 16f * density + rh)
                     btn.cx = btn.rect.centerX()
@@ -333,6 +332,27 @@ class VirtualGamepadView(context: Context, private val userDataDir: File) : View
                 val center = buttonCenter(btn)
                 btn.normalizedX = center.first / w
                 btn.normalizedY = center.second / h
+            }
+        }
+
+        /* Keep the right shoulder buttons separated, including layouts saved
+         * by older builds whose default R1/R2 positions overlapped. */
+        val r1 = buttons.firstOrNull { it.controlIndex == 9 }
+        val r2 = buttons.firstOrNull { it.controlIndex == 11 }
+        if (r1 != null && r2 != null &&
+            r1.rect.left < r2.rect.right && r2.rect.left < r1.rect.right &&
+            r1.rect.top < r2.rect.bottom && r2.rect.top < r1.rect.bottom) {
+            val gap = 10f * density * scale
+            val r2LeftCenter = r1.rect.left - gap - r2.rect.width() / 2f
+            if (r2LeftCenter >= r2.rect.width() / 2f) {
+                setButtonCenter(r2, r2LeftCenter, r2.rect.centerY())
+                r2.normalizedX = r2.cx / w
+            } else {
+                val r1RightCenter = r2.rect.right + gap + r1.rect.width() / 2f
+                if (r1RightCenter <= w - r1.rect.width() / 2f) {
+                    setButtonCenter(r1, r1RightCenter, r1.rect.centerY())
+                    r1.normalizedX = r1.cx / w
+                }
             }
         }
     }
@@ -573,26 +593,47 @@ class VirtualGamepadView(context: Context, private val userDataDir: File) : View
             stickKnobY = y
         }
         if (dist > deadzoneRadius) {
-            val angle = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble()))
-            val up = angle >= -112.5 && angle < -67.5
-            val down = angle >= 67.5 && angle < 112.5
-            val left = angle >= 135.0 || angle < -135.0
-            val right = angle >= -45.0 && angle < 45.0
-            updateDpadKey(0, up, activeDpadUp) { activeDpadUp = it }
-            updateDpadKey(2, down, activeDpadDown) { activeDpadDown = it }
-            updateDpadKey(3, left, activeDpadLeft) { activeDpadLeft = it }
-            updateDpadKey(1, right, activeDpadRight) { activeDpadRight = it }
+            val absX = kotlin.math.abs(dx)
+            val absY = kotlin.math.abs(dy)
+            val major = maxOf(absX, absY)
+            val minor = minOf(absX, absY)
+            val alreadyDiagonal = (activeDpadLeft || activeDpadRight) &&
+                (activeDpadUp || activeDpadDown)
+            val diagonalThreshold = if (alreadyDiagonal) 0.28f else 0.38f
+            val diagonal = minor >= major * diagonalThreshold
+            val currentHorizontal = activeDpadLeft || activeDpadRight
+            val currentVertical = activeDpadUp || activeDpadDown
+            val horizontal = when {
+                diagonal -> true
+                currentHorizontal && absX >= absY * 0.82f -> true
+                currentVertical && absY >= absX * 0.82f -> false
+                else -> absX >= absY
+            }
+            val up = dy < 0f && (diagonal || !horizontal)
+            val down = dy > 0f && (diagonal || !horizontal)
+            val left = dx < 0f && (diagonal || horizontal)
+            val right = dx > 0f && (diagonal || horizontal)
+            syncDpad(up, down, left, right)
         } else {
             releaseAllDpad()
         }
     }
 
-    private fun updateDpadKey(controlIndex: Int, active: Boolean, current: Boolean, setter: (Boolean) -> Unit) {
-        if (active != current) {
-            val keyCode = virtualKeyCodes[controlIndex]
-            if (active) SDLActivity.onNativeKeyDown(keyCode) else SDLActivity.onNativeKeyUp(keyCode)
-            setter(active)
-        }
+    private fun syncDpad(up: Boolean, down: Boolean, left: Boolean, right: Boolean) {
+        /* Press new directions before releasing old ones so SDL never samples a
+         * neutral movement frame while the finger changes direction. */
+        if (up && !activeDpadUp) SDLActivity.onNativeKeyDown(virtualKeyCodes[0])
+        if (down && !activeDpadDown) SDLActivity.onNativeKeyDown(virtualKeyCodes[2])
+        if (left && !activeDpadLeft) SDLActivity.onNativeKeyDown(virtualKeyCodes[3])
+        if (right && !activeDpadRight) SDLActivity.onNativeKeyDown(virtualKeyCodes[1])
+        if (!up && activeDpadUp) SDLActivity.onNativeKeyUp(virtualKeyCodes[0])
+        if (!down && activeDpadDown) SDLActivity.onNativeKeyUp(virtualKeyCodes[2])
+        if (!left && activeDpadLeft) SDLActivity.onNativeKeyUp(virtualKeyCodes[3])
+        if (!right && activeDpadRight) SDLActivity.onNativeKeyUp(virtualKeyCodes[1])
+        activeDpadUp = up
+        activeDpadDown = down
+        activeDpadLeft = left
+        activeDpadRight = right
     }
 
     private fun releaseAllDpad() {

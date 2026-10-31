@@ -17,7 +17,7 @@ compute path for mobile performance (ADR-123/124/131/132).
 | Dithering and color | Native PS1 retains original dithering. Enhance PS1/Modern can bypass it; 8-bit shading is preserved only for selected opaque GPU paths. Other paths and Software output retain BGR555 precision. |
 | Controls | Gamepad, keyboard presets, and per-key keyboard remapping are available. Android adds a configurable virtual-pad action map, show/hide toggle, button-size setting, and drag-to-position layout editor. Mouse settings remain in the controls model, but in-game mouse/touch actions are disabled by ADR-136. |
 | Gameplay options | Optional gameplay enhancements default OFF, except wild-dog attacks stay ON to preserve vanilla behavior. Optional features include NPC Relationships (ADR-144), mature planted fodder-grass spread, half-speed outdoor farm time, and the reversible shipping-bin list. Goddess Blessings add gold, restore stamina/fatigue, and provide small amounts of fodder and animal feed. Fast Text remains removed pending a better multi-line pagination design (ADR-133). |
-| Android | Native PS1, Enhance PS1, and Modern profiles render internally at native PS1 scene resolution (ADR-164); Modern retains 16:9 and bilinear presentation, and Enhance retains PGXP. The Android scaler is disabled in all three profiles after tablet lag reports, especially on Adreno. GPU Auto attempts compute for captured scenes; interpolation and desktop PGXP geometry remain disabled. The connected G100's prior 384x240 farm sample held 60-61 presents/s with zero audio underruns; this rollback has not yet been measured on-device. See GPU_TESTING.md. |
+| Android | Native PS1, Enhance PS1, and Modern profiles render internally at native PS1 scene resolution (ADR-164); Modern retains 16:9 and bilinear presentation, and Enhance retains PGXP. Android GPU scenes use nearest texture sampling in Bilinear mode to match the mobile reference path; final presentation remains bilinear (ADR-165). The connected G100's prior 384x240 farm sample held 60-61 presents/s; current scaling/filter changes have not yet been measured on-device. See GPU_TESTING.md. |
 
 Graphics and gameplay settings are stored under Documents/VanillaBTN/settings.json
 on Windows. The ESC interface is the explicit runtime-default exception to the
@@ -25,10 +25,12 @@ general enhancement-OFF rule. Automated probes and the recorded Windows/G100
 runtime samples establish coverage only for their tested scenes and devices;
 they do not establish complete gameplay parity, all display modes, or broad
 performance. See GPU_TESTING.md and PLATFORMS.md.
-The 2026-10-31 gameplay/control batch is recorded in ADR-158 through ADR-164.
+The 2026-10-31 gameplay/control batch is recorded in ADR-158 through ADR-165.
 The shipping-bin list tracks exact item variants in process memory for the
-current play session; it does not extend the original save format, so its exact
-variant list is not restored after restarting or loading a save.
+current play session, including sellable items that lack a vanilla shipment
+count slot and new items added to the portable basket. It does not extend the
+original save format, so its exact variant list is not restored after restarting
+or loading a save.
 
 ## Dated implementation history
 

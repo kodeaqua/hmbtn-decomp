@@ -56,11 +56,12 @@ typedef struct {
 typedef struct {
     s32 flags;
 } GroundHitState;
-/* farm_tile_classify's result: a tile is passable (1) or blocked (2); 0 is no tile.
- * farm_probe_tile returns the same codes. */
+/* farm_tile_classify: passable (1), blocked (2), ignored movement tile (3), or no tile (0).
+ * farm_probe_tile returns only the passable/blocked codes. */
 enum TileClass {
     TILE_CLASS_PASSABLE = 1,
     TILE_CLASS_BLOCKED = 2,
+    TILE_CLASS_IGNORED = 3,
 };
 
 /* The player's box for a tile or point query: half its width and depth on x and z, half its height on y. */
@@ -594,6 +595,17 @@ found:
     if (status > TILE_RULE_OPEN) {
         return 0;
     }
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+    /* PORT: Remove crop/weed collision only from the player's movement probe.
+     * Do this before setting hit flags so the skipped tile cannot still stop
+     * movement through player_probe_target's result flags. */
+    if (status == TILE_RULE_BLOCKED && query->current == &game_state.player &&
+        hm_gameplay_walk_through_crops() &&
+        (id == ITEM_WEEDS || id == ITEM_DEAD_WEED || (crop != CROP_NONE && crop != -1))) {
+        *query->tile = record;
+        return TILE_CLASS_IGNORED;
+    }
+#endif
     *query->flags = query->hitFlags | 0x4000;
     if (id == ITEM_BASKET) {
         *query->flags &= ~0x4000;
@@ -615,6 +627,8 @@ found:
         /* PORT: Allow player to walk through wild weeds and crops - see docs/port/DECISIONS.md#adr-080 */
         if (hm_gameplay_walk_through_crops() &&
             (id == ITEM_WEEDS || id == ITEM_DEAD_WEED || (crop != CROP_NONE && crop != -1))) {
+            if (query->current == &game_state.player)
+                return TILE_CLASS_IGNORED;
             /* Keep pickup/harvest flags while reporting a passable tile hit. */
             return TILE_CLASS_PASSABLE;
         }
@@ -717,6 +731,8 @@ s32 farm_tile_occupant(VECTOR *pos, LimitPair place, void **tile, s32 *flags, vo
         switch (farm_tile_classify(&query, 0)) {
         case TILE_CLASS_PASSABLE:
             return 1;
+        case TILE_CLASS_IGNORED:
+            break;
         case TILE_CLASS_BLOCKED:
             bit = mask & OCCUPANT_TILE_BIT6;
             return bit == 0;
@@ -1047,6 +1063,16 @@ static s32 farm_tile_state(s16 column, s16 row, s32 mode) {
     status = game_state.tileRules[ruleIndex].status;
     switch (status) {
     case TILE_RULE_BLOCKED:
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+        /* PORT: The player step probe uses this lookup independently of
+         * farm_tile_classify; keep mature crop and weed tiles passable there
+         * too. See docs/port/DECISIONS.md#adr-080. */
+        if (hm_gameplay_walk_through_crops() &&
+            (record->value == ITEM_WEEDS || record->value == ITEM_DEAD_WEED ||
+             (entry[record->value].crop != CROP_NONE && entry[record->value].crop != -1))) {
+            return 0;
+        }
+#endif
         return 1;
     case TILE_RULE_NONE:
         return 2;

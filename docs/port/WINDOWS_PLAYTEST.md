@@ -178,9 +178,7 @@ HMBTN_TRACE_GAME_STATE=1 and HMBTN_CAPTURE_FRAME to an ignored output BMP, then
 run the probe with the validated BIN path. Unit tests need no disc. Never add
 the disc, screenshots or other extracted data to git.
 
-Matching check remains unverified because this Windows host lacks the separate
-Linux toolchain and the owner excludes WSL. Source-branch reconstruction is a
-separate textual check and does not establish matching compiler output.
+
 
 ### Runtime-fixes branch: sleeping and save payload
 
@@ -283,14 +281,12 @@ synthetic tests do not establish an all-screen playthrough result.
 
 ### Start / farm summary hang (2026-10-27)
 
-Windows records AppHangB1 for the owner session, not an access violation.
-ADR-069 yields hardware progress in the status sprite loader and maps its shared
-sprite slots explicitly; the original loader fixture exposes the old native
-out-of-array address and passes after correction. Release/ASan pass 107 tests.
-Owner checks: Start from the farm, summary opening, page arrows, animal/helper/
-tool pages where available, closing, then repeated entry. No interactive result
-is claimed from the isolated loader fixture. Matching check remains unavailable
-without the separate Linux toolchain; original alternatives are checked textually.
+Windows records AppHangB1 for the owner session, not an access violation. ADR-069 yields
+hardware progress in the status sprite loader and maps its shared sprite slots
+explicitly; the original loader fixture exposes the old native out-of-array address and
+passes after correction. Release/ASan pass 107 tests. Owner checks: Start from the farm,
+summary opening, page arrows, animal/helper/ tool pages where available, closing, then
+repeated entry. No interactive result is claimed from the isolated loader fixture.
 
 ADR-070 extends the original white DRAWENV background across Natsume's extra
 canvas. Logo proportions remain unchanged. A completed displayed capture is no
