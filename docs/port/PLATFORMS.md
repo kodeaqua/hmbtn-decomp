@@ -20,6 +20,11 @@ segments use 16 KB alignment. Android backup rules exclude imported disc
 images, the temporary copy, and runtime logs from cloud backup and device
 transfer while preserving saves and settings (ADR-145).
 
+The excluded Windows `hmbtn_boot_probe` target now builds directly as well.
+The audit fixed Win32/PSY-Q `RECT` and `LoadImage` header collisions and added
+the missing crash-handler and version objects to its link inputs. The diagnostic
+binary was built but not launched.
+
 Only `windows-release -Game` updates the standalone Windows package. The
 `windows-asan-ubsan -Game` executable is a diagnostic build and requires the
 Clang ASan runtime when launched outside the toolchain environment; it is not
