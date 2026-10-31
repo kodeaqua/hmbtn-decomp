@@ -162,6 +162,23 @@ disabled. ADR-165 aligns Android GPU texture sampling with its CPU mobile path
 by skipping per-primitive bilinear taps while keeping bilinear final
 presentation. The new APK's Adreno performance has not yet been measured.
 
+Audit rerun on 2026-10-31: the Windows Release and ASan/UBSan suites each pass
+125/125 tests; the Python source-audit fixtures pass 8/8. Clang-Tidy core and
+dead-code checks pass on 76 runtime C files. `boot_probe.c` is excluded because
+its analyzer compile context conflicts with the Windows SDK `RECT` declaration;
+the normal Windows build compiles it successfully. A focused analyzer pass found
+one dead frame-deadline store, which was removed; no other non-generic findings
+remained. The full offscreen renderer probe,
+primitive opcode sweep, 2x VRAM scanout, display-area protection, texture
+precision, interpolation seams, and FXAA/MSAA probe all pass on both D3D12 and
+Vulkan with pixel comparisons against the CPU reference. The 8,192-rectangle
+farm benchmark measured 1.784/1.688 ms at 320x240 and 2.525/2.711 ms at
+960x720 on D3D12/Vulkan, respectively, on the local Radeon RX Vega. These are
+synthetic desktop measurements and do not establish Android performance.
+Android Release also builds, but ADB reported no connected device during this
+rerun; the ADR-165 APK has not been measured on Adreno, and rendering remains
+unverified on Mali.
+
 The probe's `--farm-benchmark` option renders 8,192 fixed 8x8 rectangles at
 320x240 and 960x720, with a fresh builder and an explicit GPU fence per frame.
 On the local Windows Radeon RX Vega, D3D12 capture/upload/compute/fence time

@@ -2043,7 +2043,6 @@ static void hm_host_tick(void *context, u64 tick) {
      * all visual presentation frames. */
     if (now > deadline + SDL_NS_PER_SECOND / 20) {
         hm_start = now - tick * SDL_NS_PER_SECOND / 60;
-        deadline = now;
 #ifdef __ANDROID__
         ++hm_perf.rebases;
 #endif
