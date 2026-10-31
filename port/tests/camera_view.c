@@ -1,6 +1,9 @@
 #include "model.h"
+#include "game_types.h"
 #include <inline_c.h>
 #include <stdio.h>
+
+_Static_assert(sizeof(((CameraWork *)0)->flag) == sizeof(s32), "CameraWork GTE flag must be 32-bit");
 
 int main(void) {
     MATRIX view = {0};

@@ -10,8 +10,10 @@ The playable port is built separately from the matching decompilation:
 - Android arm64-v8a: the Gradle/NDK build script produces the native APK.
   NDK 30.0.16248370, Gradle 9.8.2 and AGP 9.5.0 built the Release APK on
   2026-11-01. That APK was not installed or launched in this build run.
-- Linux and macOS: presets and architecture work exist, but builds have not
-  been validated on those hosts.
+- Linux x86-64: Fedora 44 Release and ASan/UBSan builds pass 111/111 tests.
+  SDL's offscreen Vulkan probes also pass on the Intel iGPU. The executable was
+  linked, but not launched; game boot and interactive use remain unverified.
+- macOS universal: presets exist, but no build has been validated on macOS.
 
 From the repository root:
 
@@ -20,6 +22,27 @@ From the repository root:
 
 The owner supplies and interactively tests game data. No WSL or Docker is used.
 The legacy MIPS toolchain setup notes follow.
+
+### Linux x86-64 native port
+
+Install Clang, CMake 3.24 or newer, Ninja, and the development/runtime
+dependencies for the SDL3 Linux video, audio and Vulkan backends. From
+`port/`, configure and build the playable native target and test suite:
+
+```sh
+cmake --preset linux-release -DHMBTN_BUILD_NATIVE_WINDOW=ON
+cmake --build --preset linux-release -j16
+ctest --preset linux-release
+cmake --preset linux-asan-ubsan -DHMBTN_BUILD_NATIVE_WINDOW=ON
+cmake --build --preset linux-asan-ubsan -j16
+ctest --preset linux-asan-ubsan
+```
+
+The executable is `build/port/linux-release/bin/VanillaBTN`. On the Fedora 44
+validation host, the base image lacked a compiler and development headers, so
+the build used Fedora RPMs extracted into an ignored project-local sysroot under
+`build/host-tools/`; no system packages were installed. That local sysroot is
+machine-specific and is not part of the repository.
 
 ## Legacy MIPS toolchain setup
 

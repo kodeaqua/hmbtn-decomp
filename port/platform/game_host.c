@@ -2702,7 +2702,9 @@ int hm_game_host_start(hm_disc *disc) {
     hm_gpu_output = hm_gpu_renderer_create(hm_device);
     if (hm_gpu_output) {
         hm_gpu_commands = hm_gpu_scene_create();
+#ifdef HMBTN_ENH_PAUSE_MENU
         if (!hm_options.renderer)
+#endif
             hm_gpu_replay = hm_frame_replay_acquire();
     }
     if (!hm_gpu_output || !hm_gpu_commands) {

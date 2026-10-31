@@ -414,6 +414,7 @@ initial area selection):
 | src/main/geometry/ground.c | Include two static helpers and exclude their nested copies (3 guards) |
 | src/main/geometry/ground.c | Use 32-bit VECTOR component pointers on LP64 hosts (ADR-110) |
 | src/main/geometry/model.c | Use 32-bit VECTOR component pointers in camera view construction (ADR-110) |
+| src/include/game_types.h | Keep the temporary GTE flag word 32-bit on LP64 hosts (ADR-169) |
 | src/overlay/11_GF_FARM/animals/animals.c | Include three static helpers and exclude nested copies (4 guards) |
 | src/overlay/11_GF_FARM/estate.c | Include the static estate flag helper and exclude its nested copy (2 guards) |
 | src/overlay/11_GF_FARM/menu/shop_dialogues.c | Include the static medal-row helper and exclude its nested copy (2 guards) |
@@ -448,14 +449,14 @@ initial area selection):
 | src/overlay/27_GF_TITLE/title.c | Capture all native writable title state for reentry (1 additional guard) |
 | src/overlay/15_saveload/saveload.c | Capture writable save/load state and workspace for reentry (1 additional guard) |
 
-For each of these thirty files, selecting every matching `#else` branch and
+For the original thirty files, selecting every matching `#else` branch and
 removing the new guard directives reconstructs the previous source text exactly,
 including its whitespace (line endings normalized for comparison). This check
 passed against baseline revision 9ace470. It does not establish byte-matching
 compiler output. Event staging callers preserve complete native addresses;
 additional pointer/layout hazards remain before full gameplay is safe.
 
-The current reconstruction covers 80 guards in 30 files. Following the owner's
+The current reconstruction covers 81 guards in 31 files. Following the owner's
 Load-menu hang report, an existing-process LLDB stack identified the tight
 CD-poll path. Synthetic regressions now cover both save/load asset waits,
 save workspace boundaries, original card polling and background callback types
@@ -777,8 +778,9 @@ Natsume fade-out, TV and home-exit side flicker await revalidation.
 
 Owner confirms Natsume safe on 9c57d5a but reports a load force-close. Runtime
 diagnostics identify the existing unsupported second activation of member 11.
-ADR-073 inventories all 51 farm TUs: 703 file-scope objects, 677 mutable objects
-(49,201 bytes on Windows x64), 26 top-level const exclusions, and 56 local cue
+ADR-073 initially inventoried all 51 farm TUs: 703 file-scope objects, 677
+mutable objects (49,201 bytes on Windows x64), 26 top-level const exclusions,
+and 56 local cue
 tables read only by farm_cue_step_run. Native wrappers add per-object providers
 without changing matching source or sanitizer instrumentation. Source/header
 fingerprints and TU coverage prevent silently stale metadata. Original SDK remaps
@@ -879,3 +881,13 @@ of relying on a first-match zone probe, which can hide an overlapping shipping
   supplemental proximity branch. The matching
 branch retains the original single-item shipping call and struct layout; the
 farm overlay manifest records the normalized source and header hashes.
+
+ADR-169 adds a guarded `s32` field for `CameraWork.flag` in
+`src/include/game_types.h`; its `#else` branch retains the original `long`
+declaration exactly. The farm inventory manifest header digest was refreshed.
+
+The 2026-11-01 Linux AST re-audit found two existing weather pause-random state
+globals absent from the checked farm inventory. It now covers 705 objects, and
+the Linux x86-64 fixture restores all 679 mutable objects (49,209 bytes), while
+still excluding 26 const objects and recognizing 56 read-only cue tables. No
+farm source changed.

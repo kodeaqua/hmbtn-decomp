@@ -20,9 +20,12 @@ source-audit-analyzer.json, port-audit-analyzer.json and regression/test logs.
 No owner save or screenshot is included in git. No game/replay was automated.
 
 ADR-073 adds a targeted farm-state AST inventory after the owner reproduces a
-second-load overlay abort. It covers all 51 farm TUs and 703 file-scope objects;
-the compiled inventory snapshots 677 mutable objects and excludes 26 const
-objects. All 56 function-local static arrays are cue tables with one read-only
+second-load overlay abort. The initial audit covered all 51 farm TUs and 703
+file-scope objects; the compiled inventory snapshots 677 mutable objects and
+excludes 26 const objects. On 2026-11-01, a Linux re-audit added two existing
+weather pause-random state globals, bringing the inventory to 705 file-scope
+objects and 679 mutable objects (49,209 bytes in the Linux x86-64 build). All
+56 function-local static arrays are cue tables with one read-only
 consumer, checked by AST reference use and a read-only-storage fixture. Generated
 native wrappers retain source-specific SDK definitions. No matching source was
 edited. These checks establish state restoration, not a complete gameplay audit.

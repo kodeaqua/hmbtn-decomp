@@ -23,7 +23,7 @@ static void hm_gpu_packet_type(void *packet, u8 words, u8 command) {
 }
 
 void setSprt(SPRT *packet) { hm_gpu_packet_type(packet, 4, 0x64); }
-void setPolyFT4(POLY_FT4 *packet) { hm_gpu_packet_type(packet, 9, 0x2C); }
+void setPolyFT4(void *packet) { hm_gpu_packet_type(packet, 9, 0x2C); }
 void SetPolyF4(POLY_F4 *packet) { hm_gpu_packet_type(packet, 5, 0x28); }
 
 void setSemiTrans(void *packet, s32 enabled) {

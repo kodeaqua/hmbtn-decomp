@@ -208,7 +208,7 @@ u16 GetClut(s32 x, s32 y);
 u16 getTPage(s32 depth, s32 blend, s32 x, s32 y);
 u16 GetTPage(s32 depth, s32 blend, s32 x, s32 y);
 void setSprt(SPRT *packet);
-void setPolyFT4(POLY_FT4 *packet);
+void setPolyFT4(void *packet);
 void SetPolyF4(POLY_F4 *packet);
 void setSemiTrans(void *packet, s32 enabled);
 void SetSemiTrans(void *packet, s32 enabled);

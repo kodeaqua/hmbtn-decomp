@@ -30,7 +30,12 @@ typedef struct {
     MATRIX  translation;
     SVECTOR angle;
     VECTOR  position;
+#ifdef HMBTN_PORT
+    /* PORT: keep the GTE flag word 32-bit on LP64 hosts — see docs/port/DECISIONS.md#adr-169 */
+    s32 flag;
+#else
     long    flag;
+#endif
 } CameraWork;
 
 #endif /* GAME_TYPES_H */
