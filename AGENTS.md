@@ -34,9 +34,7 @@ override this one for their subtree.
   Existing workflow files remain untouched. CI requirements elsewhere in this
   document are deferred until the owner explicitly requests CI work.
 - Use native Windows tools only for the current port work. Do not install,
-  invoke, or require WSL. Matching `check` uses a separate Linux toolchain;
-  defer that validation when unavailable and report it as unverified, without
-  blocking Windows port work or asking the owner to enable WSL.
+  invoke, or require WSL.
 - The owner performs interactive gameplay testing. Agents handle implementation,
   builds and isolated technical/unit checks; do not launch gameplay or replay
   sessions unless the owner explicitly requests them.
@@ -147,7 +145,6 @@ Verified from the README:
   assembler wrapper in `tools/maspsx`.
 - **Owner decision: this project does NOT use Docker** (no containers for building, testing, CI, or packaging).
   The `Dockerfile` is kept only as a *reference* for which tools/versions the matching build needs (Section 12).
-- `check` target compares outputs to the original SHA-1s. Without `-DORIGINAL_DISC` it builds/checks the 14 code binaries only (no game data needed).
 - Two non-source exceptions: one patched SDK word (`sdk/patches.txt`) and 13 `GAP` padding entries in overlay `CMakeLists.txt`.
 - Layout: `.github/workflows`, `cmake/`, `disc/`, `sdk/`, `src/`, `tools/`, `CMakeLists.txt`, `Dockerfile`.
 - License: CC0-1.0 for this repo's own work; `tools/maspsx` has its own license. Game data and PSY-Q are **not** included and must never be added.
@@ -184,8 +181,8 @@ docs/port/
 
 ## 3. Hard rules for the matching decomp (do not violate)
 
-1. The existing matching build (CMake `check` target, run **natively, without Docker** — Section 12) **must keep passing**.
-   Any change under `src/`, `sdk/`, `cmake/`, `tools/`, `disc/` requires running `check` before you finish.
+1. Preserve the matching source and build inputs. Keep port behavior in the port layer,
+   and make only narrow, owner-requested decompilation edits under the guards below.
 2. Prefer **zero edits to `src/`**. Port behavior goes in `port/compat/` via force-included headers
    (`-include`), macro/type shims, and link-time replacement of library functions.
 3. If `src/` must change for the port, use a narrow guard and document it:
@@ -200,7 +197,7 @@ docs/port/
    Keep a running list of every such guard in `docs/port/ANALYSIS.md`.
 4. Never "clean up", reformat, rename, or refactor decomp source "while you're there".
 5. Do not edit `sdk/patches.txt` or overlay `GAP` entries unless the task is specifically about them.
-6. If the matching toolchain or network is unavailable in your sandbox, **say so explicitly** and do not claim `check` passed.
+6. State clearly when a build or runtime behavior could not be verified.
 
 ## 4. Legal and licensing rules
 
@@ -309,7 +306,7 @@ Design for all four from day one (no desktop-only assumptions: blocking dialogs,
 
 Work through phases in order; do not start enhancements before Phase 6 unless the owner says so.
 
-- **Phase 0 — Recon & guardrails.** Confirm matching `check` is green. Produce `ANALYSIS.md` (libs/functions used, overlay map, symbol collisions, hardware addresses, asm/GTE macro usage, pointer/layout hazards, asset formats). Create `port/` skeleton, CMake presets, CI skeleton.
+- **Phase 0 - Recon & guardrails.** Produce `ANALYSIS.md` (libs/functions used, overlay map, symbol collisions, hardware addresses, asm/GTE macro usage, pointer/layout hazards, asset formats). Create `port/` skeleton, CMake presets, CI skeleton.
 - **Phase 1 — Native boot (Linux).** Compile `src/` natively with compat headers + stubbed runtime. Reach the main loop and title init (black screen OK). Overlay linking solved.
 - **Phase 2 — Video.** GTE, GPU API, VRAM model, first backend, rendering of the first screens.
 - **Phase 3 — Disc & data.** CD/file layer over user disc image, overlay loading, assets, first-run flow.
@@ -325,22 +322,7 @@ Work through phases in order; do not start enhancements before Phase 6 unless th
 
 **No Docker.** Everything runs directly on the host. Do not add Dockerfiles, compose files, devcontainers, or container-based CI steps.
 
-**Matching build (run natively when touching decomp dirs):**
-
-The upstream README only documents a Docker flow, so the native steps must be derived, not guessed:
-1. Read `Dockerfile`, `cmake/`, `tools/`, and `.github/workflows/` to list exactly which tools and versions the matching build needs
-   (cross-compiler/PSY-Q toolchain, Python version and packages, Ninja, CMake, any helper binaries) and where they come from.
-2. Write the result to `docs/port/NATIVE_BUILD.md` and automate it with an idempotent script (`tools/setup-native.sh`; a native PowerShell equivalent only if needed). Pin versions and verify checksums. Do not use WSL.
-3. The old PSY-Q-era toolchain is likely **Linux x86-64 only**. If so, the matching `check` is supported on a separate Linux host only; say that plainly in the doc. Do not make it a prerequisite for current Windows port work when that host is unavailable.
-   The **port itself must build natively on all four platforms** and must never require the matching toolchain.
-4. Keep the PSY-Q SDK and the original toolchain files **out of git** (Section 4); the setup script takes them from the owner's local copy or the official download location, never from this repo.
-
-```bash
-# Once Phase 0 defines it (names are the convention; create them if missing):
-tools/setup-native.sh                                   # install/verify toolchain, no containers
-cmake -S . -B build/match -G Ninja && cmake --build build/match --target check
-# With disc (local only, never in CI): add  -DORIGINAL_DISC=/path/to/disc.bin
-```
+**Matching decompilation toolchain:** Legacy setup details are documented in docs/port/NATIVE_BUILD.md; the native game port does not require those tools.
 
 **Port build (to be created in Phase 0 — keep these names stable once they exist):**
 ```bash
@@ -353,7 +335,7 @@ If a command here does not exist yet, create it as part of the relevant task rat
 
 ## 13. Testing strategy
 
-- **CI never has game data and never uses Docker.** CI runs natively on GitHub-hosted runners (or equivalent): matching `check` (no disc, Linux only if the toolchain requires it), port builds for every supported platform, unit tests, sanitizer builds, headless smoke tests (SDL dummy video/audio drivers, software or null gfx backend).
+- **CI never has game data and never uses Docker.** CI runs natively on GitHub-hosted runners (or equivalent): port builds for every supported platform, unit tests, sanitizer builds, headless smoke tests (SDL dummy video/audio drivers, software or null gfx backend).
 - **Unit tests:** GTE operations (bit-exact vectors), GPU primitive rasterization/state decode, SPU ADPCM decode/ADSR, CD sector parsing, struct layout `_Static_assert`s, overlay symbol table.
 - **Local-only data tests** (skipped when no disc is configured): deterministic **input replay** files → per-frame hash of VRAM/audio buffer; golden-frame comparisons with tolerance rules documented per backend.
 - **Determinism:** same disc + same replay + same build = same hashes on every platform for the vanilla path. Treat divergence as a bug.
@@ -389,7 +371,6 @@ If a command here does not exist yet, create it as part of the relevant task rat
   Good: `feat(gpu): add semi-transparency blend modes`. Bad: `Added stuff to GPU.`
 - Breaking changes: `!` after the type/scope (`feat(platform)!: ...`) plus a `BREAKING CHANGE:` footer.
 - One logical change per commit. Do not mix `src/` guard edits with port-layer work; keep them separate so the matching impact is easy to review.
-- Any commit that touches decomp-side directories should say in the body that `check` was run (or why it could not be).
 - Do not add `Co-authored-by` or tool-attribution lines unless the owner asks.
 - Examples:
   - `fix(compat): use fixed-width types for overlay table entries`
@@ -404,14 +385,13 @@ If a command here does not exist yet, create it as part of the relevant task rat
 1. Read this file and the relevant nested `AGENTS.md`/docs. Look at existing code before adding new code.
 2. State a short plan; keep changes scoped to the task. One concern per PR.
 3. If a choice affects architecture, public interfaces, licensing, or platform support and is not decided here: **ask the owner**; otherwise pick the conservative default, record an ADR, and continue.
-4. Implement → build → test. Run the relevant presets and (if `src/`-adjacent files changed) the matching `check`.
-5. In your final message report: what changed, commands run with results, what you could **not** verify (missing matching toolchain, no disc, no device), and follow-ups.
+4. Implement, build, and test. Run the relevant presets for the touched areas.
+5. In your final message report: what changed, commands run with results, what you could **not** verify (missing host tools, no disc, no device), and follow-ups.
 6. **Never** claim something works if you did not run it. **Never** fabricate benchmark numbers.
 
 ## 16. Definition of done
 
 A change is done when:
-- [ ] Matching `check` is still green (if any decomp-side file was touched) — or you explicitly state it could not be run.
 - [ ] Port builds on all platforms that currently have presets; sanitizer preset passes for touched areas.
 - [ ] Tests added/updated and passing; vanilla parity unaffected (enhancements OFF).
 - [ ] No game data, BIOS, SDK files, or secrets committed; `THIRD_PARTY.md` updated for new deps.

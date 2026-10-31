@@ -1,15 +1,15 @@
 # Native build setup
 
-## Current native game builds (2026-10-30)
+## Current native game builds (2026-11-01)
 
 The playable port is built separately from the matching decompilation:
 
 - Windows x86-64: use the Windows build script below. The latest recorded
-  Windows game build produced the standalone package and passed 124/124 tests;
-  that result was not rerun for this documentation update.
+  Windows -Game Release build produced the standalone package and passed
+  125/125 tests on 2026-11-01. The Windows ASan/UBSan preset passed 108/108.
 - Android arm64-v8a: the Gradle/NDK build script produces the native APK.
-  NDK r27c has a recorded successful build. Device and full-game validation
-  remain incomplete.
+  NDK 30.0.16248370, Gradle 9.8.2 and AGP 9.5.0 built the Release APK on
+  2026-11-01. That APK was not installed or launched in this build run.
 - Linux and macOS: presets and architecture work exist, but builds have not
   been validated on those hosts.
 
@@ -19,11 +19,11 @@ From the repository root:
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File port/packaging/android/build.ps1 -BuildType Release
 
 The owner supplies and interactively tests game data. No WSL or Docker is used.
-The separate matching-build requirements and limitations follow.
+The legacy MIPS toolchain setup notes follow.
 
-## Matching build
+## Legacy MIPS toolchain setup
 
-Supported matching setup target: a separate Linux x86-64 host. The owner excludes
+The supported host for this legacy toolchain is a separate Linux x86-64 machine. The owner excludes
 WSL from the current work; do not install, invoke, or require it.
 The historical GCC archive contains Linux executables, not Windows programs.
 Windows/macOS native matching support has not been established. This restriction
@@ -37,11 +37,11 @@ Requirements derived from `Dockerfile`, `cmake/`, `tools/`, and the old workflow
 | PSY-Q runtime | 4.7 | Owner-provided local zip; SHA-256 below |
 | MIPS binutils | `mips-linux-gnu-{as,ld,objcopy}`; Fedora `binutils-mips64-linux-gnu` is adapted by the setup script to O32/ELF32 little-endian | Host distribution package; upstream did not pin a version |
 | Python | minimum 3.10; reference image used 3.14 | Standard library only; no pip packages found |
-| CMake | minimum 3.20 matching, 3.24 port | Host distribution package; reference did not pin patch version |
+| CMake | minimum 3.20 for this toolchain, 3.24 for the port | Host distribution package; reference did not pin patch version |
 | Ninja | reference distribution package | Upstream did not pin version |
 | maspsx | vendored revision | `tools/maspsx/UPSTREAM` |
 | curl, tar, sha256sum | host tools | Setup download, extraction, verification |
-| objdiff-cli | 3.8.2, optional report only | Previous workflow; not needed by `check` |
+| objdiff-cli | 3.8.2, optional report only | Previous workflow; optional report tool |
 
 Archive hashes, preserved from the reference Dockerfile:
 
@@ -63,8 +63,7 @@ Fedora package names:
 sudo dnf install python3 cmake ninja-build curl tar coreutils binutils-mips64-linux-gnu
 ```
 
-The Fedora cross-binutils use a `mips64-linux-gnu-` command prefix. Setup checks
-that the installed linker supports `elf32ltsmip` and generates local wrappers in
+The Fedora cross-binutils use a `mips64-linux-gnu-` command prefix. Setup verifies that the installed linker supports `elf32ltsmip` and generates local wrappers in
 the ignored `build/` tree, forcing the assembler to ABI32 and the linker to
 little-endian ELF32. Standard `mips-linux-gnu-` tools are used directly.
 
@@ -72,10 +71,9 @@ From the repository root, provide your local PSY-Q 4.7 archive:
 
 ```sh
 PSYQ_ARCHIVE=/path/to/your/runtime-4.7.zip bash tools/setup-native.sh
-cmake --build build/match --target check -j16
 ```
 
-Setup checks the local SDK archive and downloads only the checksum-pinned GCC
+Setup verifies the local SDK archive and downloads only the checksum-pinned GCC
 archive from the release URL in the script. It prepares ignored `sdk/` directories,
 normalizes header names/line endings, and configures the standard matching build
 directory with absolute tool paths. Repeating it re-verifies both inputs and
@@ -87,12 +85,8 @@ reconfigured by setup first. Do not put SDK archives in tracked directories.
 The compatibility script `tools/install_host_sdk.sh` now forwards to native setup.
 No container command is required.
 
-`check` without ORIGINAL_DISC verifies 14 code binaries against
-`disc/binaries.sha1`. Add `-DORIGINAL_DISC=/path/to/disc.bin` only for local disc
-reconstruction. CI must never receive disc data.
-
 The reference did not pin host package versions. A fully reproducible host-tool
-manifest remains pending a successful matching baseline; no versions have been
+manifest remains pending a verified native baseline; no versions have been
 invented here. Workflows/CI are excluded by owner instruction. Existing upstream
 workflow files are unchanged and are not part of this setup.
 
@@ -197,7 +191,7 @@ built and passed 25 tests with Clang 20.1.8; Clang 19's ASan had failed during
 startup (ADR-005). The matching build, Linux/macOS builds and full game execution
 remain unverified. Eleven native guards in five original files are listed in
 ANALYSIS.md. Their matching branches reconstruct the preceding source text
-exactly; this is not a claim that matching check passed.
+exactly; this does not prove byte-for-byte output parity.
 
 For the optional synthetic OT-construction benchmark, from a repository-root
 session with the local toolchain on PATH and windows-release already built:

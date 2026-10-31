@@ -1,14 +1,28 @@
 # Platform status
 
-## Current status (2026-10-31)
+## Current status (2026-11-01)
 
 | Target | Current validation |
 | --- | --- |
-| Windows x86-64 | Release build and 125/125 tests pass. ASan/UBSan suite passes all 125 tests. Full synthetic renderer, opcode, VRAM scanout, interpolation seam, and FXAA/MSAA probes pass with pixel comparisons on D3D12 and Vulkan. Full-playthrough parity remains unverified. |
-| Android arm64-v8a | Release APK builds with AGP 9.5.0, Gradle 9.8.2, and NDK 30.0.16248370. A prior owner-tested G100 farm sample reports 100% submitted GPU frames in two steady 600-frame windows and 60-61 presents/s at 384x240. The live Adreno 610 baseline at 520x240 is 15 presents/s with 44-50 ms GPU submit and substantial audio underflow. The native-coordinate shader fast path builds and passes D3D12/Vulkan reference probes; its Adreno performance is not yet measured because the owner is using the current game session. Latest Mali rendering remains unverified. |
+| Windows x86-64 | Windows -Game Release build and 125/125 tests pass. The latest Windows ASan/UBSan preset passes 108/108 tests. Full synthetic renderer, opcode, VRAM scanout, interpolation seam, and FXAA/MSAA probes pass with pixel comparisons on D3D12 and Vulkan. Full-playthrough parity remains unverified. |
+| Android arm64-v8a | Release APK builds with AGP 9.5.0, Gradle 9.8.2, and NDK 30.0.16248370. Earlier owner gameplay reported smooth play on a G100 tablet; this audit did not run gameplay. An Adreno 610 performance investigation is deferred, and Mali rendering remains unverified. |
 | Linux x86-64 | Deferred to a separate Linux host; WSL is excluded. |
 | macOS universal | No macOS build has been validated. |
-| Matching build | The check target remains unverified on this Windows host because its separate Linux toolchain is unavailable. |
+
+### Follow-up verification (2026-11-01)
+
+The Windows Release -Game build completed and CTest passed 125/125 tests.
+The Windows ASan/UBSan preset passed 108/108 tests. The offscreen renderer
+probe passed on Vulkan and Direct3D 12, including the primitive opcode sweep.
+Android Release completed with AGP 9.5.0, Gradle 9.8.2, and NDK
+30.0.16248370. The APK was not installed
+or launched during this verification run. No interactive game was opened.
+
+The latest gameplay changes include the Walk Crops movement-probe repair,
+shipping-bin stack and portable-basket accounting, and the one-window shipped
+items view with a four-column, two-row icon grid. Generic storage-slot touch
+selection was reverted after the owner reported it felt unsmooth; shipping-bin
+item selection and pause-menu pointer navigation remain available.
 
 ### Core, Windows and Android audit (2026-10-31)
 
@@ -41,6 +55,16 @@ to 100%; ADR-146 now preserves configured levels. The new mixer regression
 checks confirm that zero-volume sequence music and effects are silent while
 their playback continues. Both focused tests also pass under the Windows
 ASan/UBSan preset.
+
+This follow-up audit found Android's manifest required GLES 3.0 even though
+the Android renderer creates an SDL_GPU Vulkan compute device. The manifest
+now declares Vulkan 1.0 and baseline compute as required and GLES as optional,
+so store/device filtering matches the runtime backend. Android and desktop
+also now cap frames in flight at two, matching ADR-121. Windows Release
+rebuilds with 125/125 tests passing; Android `assembleRelease` passes with the
+pinned Gradle, AGP, and NDK versions. No gameplay session or Android device
+was launched for this audit. Windows ASan/UBSan CTest also passes 125/125
+with the LLVM runtime directory on `PATH`.
 
 Gradle reports deprecated APIs that may become errors with Gradle 10; the
 current pinned build succeeds. No interactive Windows playthrough was performed.
@@ -84,9 +108,7 @@ and NDK 30.0.16248370. The 8.38 MB APK passed `apksigner verify`,
 for every native load segment. It uses the local debug signing config and is
 not production-signed. No Android device or gameplay test was run.
 
-The matching decompilation check was not run because its separate Linux
-toolchain is unavailable on this Windows host. No files under matching source
-directories were changed.
+No files under matching source directories were changed.
 
 ## Historical validation notes
 
@@ -402,13 +424,12 @@ Interactive overnight/dialogue/Yodel Ranch validation remains with the owner.
 
 ### Second source-audit validation (2026-10-27)
 
-Native Windows commands: cmake --build build/port/windows-release and ctest
---test-dir build/port/windows-release --output-on-failure; equivalent commands
-for windows-asan-ubsan. Both builds and all 99 tests pass. A separate ASan family
-name fixture reads the SHA-1-validated owner disc without executing gameplay.
-Seven touched translation units pass targeted Clang analysis without selected
-core/unix/security diagnostics. No performance improvement or other-device result
-is claimed. Matching check is unavailable without the separate Linux toolchain.
+Native Windows commands: cmake --build build/port/windows-release and ctest --test-dir
+build/port/windows-release --output-on-failure; equivalent commands for
+windows-asan-ubsan. Both builds and all 99 tests pass. A separate ASan family name
+fixture reads the SHA-1-validated owner disc without executing gameplay. Seven touched
+translation units pass targeted Clang analysis without selected core/unix/security
+diagnostics. No performance improvement or other-device result is claimed.
 
 ### Third source-audit validation (2026-10-27)
 
@@ -431,15 +452,13 @@ command replay is unavailable; content remains proportional.
 
 ### Summary and splash follow-up (2026-10-27)
 
-Release/ASan builds and ctest --output-on-failure pass 107/107 tests. The added
-fixture executes the original farm-summary sprite loader with bounded synthetic
-CD progress and validates five shared sprite slots. Rebuilt offscreen GPU probe
-passes Vulkan and D3D12 readbacks with original white/black DRAWENV backgrounds,
-both frame-buffer origins, native/enlarged output and filtering modes. Shader
-headers are regenerated with pinned DXC. No performance claim or other-platform
-build is made. Matching check cannot run without the separate Linux toolchain;
-original status-page source alternatives reconstruct exactly with native guards
-disabled. User gameplay validation remains separate from these fixtures.
+Release/ASan builds and ctest --output-on-failure pass 107/107 tests. The added fixture
+executes the original farm-summary sprite loader with bounded synthetic CD progress and
+validates five shared sprite slots. Rebuilt offscreen GPU probe passes Vulkan and D3D12
+readbacks with original white/black DRAWENV backgrounds, both frame-buffer origins,
+native/enlarged output and filtering modes. Shader headers are regenerated with pinned
+DXC. No performance claim or other-platform build is made. User gameplay validation
+remains separate from these fixtures.
 
 ### Fade/camera context regression checks (2026-10-27)
 
@@ -478,15 +497,13 @@ A separate Windows build with all enhancement options OFF also compiles the farm
 and lifecycle fixtures; both overlay.farm_reentry and overlay.title_load_return
 pass. This is a targeted OFF-build check, not a full second test-suite run.
 
-ADR-075 validation (2026-10-28): Windows Release and ASan/UBSan builds use 12 jobs;
-both full suites pass 111/111 tests. The added fixture reproduces the former
-pickup pointer overwrite, preserves four native actor prefixes and all seven
-helper IDs, and exercises 16 young/adult dog pickup/drop combinations plus 960
-phase updates. An enhancements-OFF build passes the actor-layout and farm/title
-re-entry fixtures (3/3). Clang AST --check still audits all 51 farm units,
-703 objects and 56 local cue tables. No assets, gameplay or real save files are
-used by these fixtures. Matching source is unchanged; matching check and other
-platform builds were not run on this Windows host.
+ADR-075 validation (2026-10-28): Windows Release and ASan/UBSan builds use 12 jobs; both
+full suites pass 111/111 tests. The added fixture reproduces the former pickup pointer
+overwrite, preserves four native actor prefixes and all seven helper IDs, and exercises
+16 young/adult dog pickup/drop combinations plus 960 phase updates. An enhancements-OFF
+build passes the actor-layout and farm/title re-entry fixtures (3/3). Clang AST --check
+still audits all 51 farm units, 703 objects and 56 local cue tables. No assets, gameplay
+or real save files are used by these fixtures.
 
 ### Full suite and Android platform validation (2026-10-30)
 
@@ -508,15 +525,13 @@ passes 124/124 tests, and produces the standalone v0.9.0 ZIP. The three focused
 gameplay/interpolation tests also pass with the Windows ASan/UBSan preset.
 Marker checks include actual opaque-terrain occlusion and the disabled path.
 
-The synthetic offscreen `hmbtn_gpu_renderer_probe direct3d12 --tile-seams`
-passes shared-row readback at 32x32, 65x97 and 1128x634 with 1/2/4 samples.
-This reproduces mixed interpolation fallback between adjoining sprite rows;
-it does not confirm the owner's complete gameplay scene or other GPUs.
-The broader GPU reference probe separately fails its native color comparison
-(GPU 130 versus CPU 132); its shader output adds micro-dithering while that
-fixture expects an exact match. This task does not change shaders or relax
-that comparison. No interactive gameplay, Android/device validation, other
-platform builds or Linux matching check was run. Matching source is unchanged.
+The synthetic offscreen `hmbtn_gpu_renderer_probe direct3d12 --tile-seams` passes
+shared-row readback at 32x32, 65x97 and 1128x634 with 1/2/4 samples. This reproduces
+mixed interpolation fallback between adjoining sprite rows; it does not confirm the
+owner's complete gameplay scene or other GPUs. The broader GPU reference probe
+separately fails its native color comparison (GPU 130 versus CPU 132); its shader output
+adds micro-dithering while that fixture expects an exact match. This task does not
+change shaders or relax that comparison. Matching source is unchanged.
 
 ### Active primitive arena correction (ADR-112, 2026-10-30)
 
@@ -527,15 +542,14 @@ The corrected capacity check covers Tile Targeting and the tool charge gauge.
 Regression checks use separate active/backup allocations and verify that a
 genuinely full active arena rejects both indicators.
 
-The Windows Release game build and standalone package pass 124/124 tests;
-the focused gameplay test also passes Windows ASan/UBSan. The owner requests
-16 build jobs for this machine; Windows build.ps1 now uses `-j16`, and a
-subsequent incremental `cmake --build build/port/windows-release -j16` passes
-with no remaining work. The owner reopened the rebuilt game, and direct window
-capture confirms a cyan tile marker in front of the player during normal farm
-gameplay. This observation does not establish other-area coverage. Horizontal
-lines while running are explicitly deferred; no additional graphics fix is
-claimed. Matching source is unchanged and its Linux check was not run.
+The Windows Release game build and standalone package pass 124/124 tests; the focused
+gameplay test also passes Windows ASan/UBSan. The owner requests 16 build jobs for this
+machine; Windows build.ps1 now uses `-j16`, and a subsequent incremental `cmake --build
+build/port/windows-release -j16` passes with no remaining work. The owner reopened the
+rebuilt game, and direct window capture confirms a cyan tile marker in front of the
+player during normal farm gameplay. This observation does not establish other-area
+coverage. Horizontal lines while running are explicitly deferred; no additional graphics
+fix is claimed.
 
 The shared GPU output no longer adds unconditional presentation noise after
 BGR555 colour expansion (ADR-113). Original primitive dithering is unchanged.

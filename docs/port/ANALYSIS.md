@@ -1,12 +1,11 @@
 # Native port reconnaissance
 
 This is the source/overlay inventory baseline from 2026-10-25, not the current
-feature-status page. The Windows game has since reached the title and farm;
-Android arm64-v8a build support has also been added. Full gameplay parity and
-the matching check remain unverified. Current Windows user data is under
-Documents/VanillaBTN; older BackToNature references below are historical
-(ADR-137). See PLATFORMS.md for current platform status and ENHANCEMENTS.md
-for current renderer coverage.
+feature-status page. The Windows game has since reached the title and farm; Android
+arm64-v8a build support has also been added. Current Windows user data is under
+Documents/VanillaBTN; older BackToNature references below are historical (ADR-137). See
+PLATFORMS.md for current platform status and ENHANCEMENTS.md for current renderer
+coverage.
 
 At the time of this inventory, all 113 original C units compiled. A native
 console probe executed the original boot prefix, but title rendering/gameplay
@@ -476,35 +475,30 @@ the BBGGRR comment in window_frame.c is inaccurate and is left untouched in
 the matching source. The conversion is corrected and regression-tested. The
 rearranged root/Graphics UI has private asset-only previews, not game sessions.
 
-Known owner-reported issue: sleeping/saving still crashes with 0xC0000005
-(native exit -1073741819). This is queued after the pause layout work; no fix
-or confirmed faulting source line is claimed. Raw PS1 packing views and the
-in-game save ABI remain unaudited even though the native card backend tests pass.
-VSync/FPS settings use a separate rational presentation clock (ADR-049). The
-original VSync(2) game loop and fixed 60 Hz tick runtime are untouched. Synthetic
-tests verify invariant native callback counts across presentation caps. Extra
-presentations duplicate the native image unless enhance.interpolation is enabled.
-The requested experimental interpolation module uses private VRAM/environment
-replay and generic observers at native-only main.c SDK call aliases (ADR-050).
-Normal farm geometry can interpolate; other contexts retain native scanout.
-All 76 release/sanitizer units pass; physical/gameplay validation remains pending.
-No additional matching source edits or guards are required.
-The port builds all 113 units and links a boot diagnostic and SDL game window.
-Local 39000-VBlank release/sanitizer replays complete the opening and verify
-house exit and free farm movement after the Thomas/Zack dialogue. Wider
-gameplay and full-playthrough parity remain unverified.
-Matching `check` is unverified: its Linux toolchain is unavailable on the
-Windows-only host, and the owner excludes WSL. Project-local Windows tools were
-provisioned: CMake 3.31.6 and Ninja 1.12.1. LLVM-mingw was upgraded from
-20241001 (Clang 19.1.1) to 20250709 (Clang 20.1.8) after ASan failed during
-startup on this host; see ADR-005. Windows release and ASan/UBSan tests are
-recorded in PLATFORMS.md.
-An Android NDK Clang 18.0.3 freestanding syntax check of the type test also passed;
-this is not an Android build. Disc diagnostics are recorded above; full-game
-and device tests have not run.
+Historical owner report: sleeping/saving once crashed with 0xC0000005 (native exit
+-1073741819). The owner later reported it safe; exact sleep/save scenarios were not
+specified, so broader parity remains unverified. Raw PS1 packing views and the in-game
+save ABI remain unaudited even though the native card backend tests pass. VSync/FPS settings use a separate
+rational presentation clock (ADR-049). The original VSync(2) game loop and fixed 60 Hz
+tick runtime are untouched. Synthetic tests verify invariant native callback counts
+across presentation caps. Extra presentations duplicate the native image unless
+enhance.interpolation is enabled. The requested experimental interpolation module uses
+private VRAM/environment replay and generic observers at native-only main.c SDK call
+aliases (ADR-050). Normal farm geometry can interpolate; other contexts retain native
+scanout. All 76 release/sanitizer units pass; physical/gameplay validation remains
+pending. No additional matching source edits or guards are required. The port builds all
+113 units and links a boot diagnostic and SDL game window. Local 39000-VBlank
+release/sanitizer replays complete the opening and verify house exit and free farm
+movement after the Thomas/Zack dialogue. Wider gameplay and full-playthrough parity
+remain unverified. Project-local Windows tools were provisioned: CMake 3.31.6 and Ninja
+1.12.1. LLVM-mingw was upgraded from 20241001 (Clang 19.1.1) to 20250709 (Clang 20.1.8)
+after ASan failed during startup on this host; see ADR-005. Windows release and
+ASan/UBSan tests are recorded in PLATFORMS.md. An Android NDK Clang 18.0.3 freestanding
+syntax check of the type test also passed; this is not an Android build. Disc
+diagnostics are recorded above; full-game and device tests have not run.
 
-Remaining Phase 0 gates: native matching baseline, complete SDK and layout
-inventory, compiled overlay symbol collision map, broader sanitizer coverage, and reproducible
+Remaining Phase 0 gates: complete SDK and layout inventory, compiled overlay
+symbol collision map, broader sanitizer coverage, and reproducible
 matching host-tool pins. The owner prioritizes Windows and excludes workflow/CI
 work for now. Existing workflows remain unchanged.
 
@@ -582,12 +576,10 @@ New guards all require HMBTN_PORT && HMBTN_ENH_WIDESCREEN:
   corners in field_square_cells (rendering-only grid coverage).
 
 The original else branches/disabled source reconstruct HEAD exactly in a local
-mechanical comparison. This is not a matching binary check: that requires the
-unavailable Linux matching toolchain; WSL remains prohibited. No SDK/GAP changes.
-Source projection/depth remain native. Wider CPU culling feeds existing OTs;
-private replay expands world clipping while UI remains native. Original
-primitive/overlay backup buffers are unchanged; private GS work arenas are
-restored on OFF/scene exit. See ADR-056 for visibility/capacity limitations.
+mechanical comparison. No SDK/GAP changes. Source projection/depth remain native. Wider
+CPU culling feeds existing OTs; private replay expands world clipping while UI remains
+native. Original primitive/overlay backup buffers are unchanged; private GS work arenas
+are restored on OFF/scene exit. See ADR-056 for visibility/capacity limitations.
 
 ### All-screen viewport and fallback correction (ADR-057)
 
@@ -626,10 +618,10 @@ with original shifts/checksums. The old packer reproduces an invalid run16 read
 through its obsolete FarmState offset; the new synthetic fixture passes.
 Livestock-transfer SaveFile/SaveImage casts are not covered by this codec audit.
 
-The disabled new guards reconstruct both prior source files exactly after line
-ending normalization. This does not replace the unavailable Linux matching check.
-Full sleep, overnight events, menu save/load and PS1 interchange still need owner
-validation; no gameplay or replay was used by these technical regression tests.
+The disabled new guards reconstruct both prior source files exactly after line ending
+normalization. Full sleep, overnight events, menu save/load and PS1 interchange still
+need owner validation; no gameplay or replay was used by these technical regression
+tests.
 
 ### Follow-up dialogue, overnight wait and SDK audit (2026-10-27)
 
@@ -721,9 +713,8 @@ sentinel fixture before correction. Valid pickup transformations, actor flags,
 terrain decisions and callback quotas remain covered. Runtime image diagnostics
 replace an uninitialized rectangle on missing images, not a successful fallback.
 Both Windows builds pass all 106 tests; targeted analysis of six changed units
-reports zero selected analyzer/ABI warnings. Original source reconstruction is
-checked separately; matching compiler output and interactive gameplay remain
-unverified. No gameplay was launched in this batch.
+reports zero selected analyzer/ABI warnings. Original source reconstruction was compared separately; interactive gameplay
+remains unverified. No gameplay was launched in this batch.
 
 ### Wide transitions and rucksack shade (2026-10-27)
 
@@ -739,15 +730,13 @@ pass. Full interactive coverage and map-side asset availability remain unverifie
 ### Farm summary hang follow-up (2026-10-27)
 
 ADR-069 extends the blocking CD poll adapter to status_pages.c. Its only
-afile_read_bytes calls initiate and poll inside the same blocking loader.
-The source fixture also confirms out-of-array addressing of the two shared
-sprite globals. Four HMBTN_PORT guards in
-src/overlay/11_GF_FARM/menu/status_pages.c add the slot resolver include, guarded
-loader binding and guarded sprite selection in status_draw_sprite_label and
-status_draw_entry. Disabled native guards reconstruct the original exactly;
-this is not a matching binary check. Matching toolchain unavailable, no WSL.
-The original loader fixture and all 107 Release/ASan tests pass. No gameplay or
-owner save is used in the fixture.
+afile_read_bytes calls initiate and poll inside the same blocking loader. The source
+fixture also confirms out-of-array addressing of the two shared sprite globals. Four
+HMBTN_PORT guards in src/overlay/11_GF_FARM/menu/status_pages.c add the slot resolver
+include, guarded loader binding and guarded sprite selection in status_draw_sprite_label
+and status_draw_entry. Matching toolchain unavailable, no WSL. The original loader
+fixture and all 107 Release/ASan tests pass. No gameplay or owner save is used in the
+fixture.
 
 ### Splash backdrop and cutscene buffer identity (2026-10-27)
 
@@ -870,11 +859,23 @@ remains unchanged in the matching-build branch, and the farm overlay manifest
 tracks the normalized source hash.
 
 ADR-080 preserves tile interaction flags while the native Walk Crops option makes
-field crops and weeds passable. This keeps wild/dead weed pickup and mature grass
-harvest reachable without changing movement when the option is OFF. The farm
-overlay manifest tracks the normalized source hash.
+field crops and weeds passable. The movement-only probe forwards the player actor
+identity, and the tile callback skips crop/weed hits before setting blocking result
+flags; other actors and obstacles still participate. The separate sprint-step
+lookup also honors the option. The matching branches remain unchanged, and the
+farm overlay manifest tracks the normalized source and header hashes.
 
 ADR-156 extends the GPU VRAM scanout recovery path to captured scenes that fail
 replay or packing, with CPU rendering retained if scanout itself cannot be
 submitted. A GPU scene regression verifies scanout can rebuild after an
 unsupported GP0 opcode.
+
+ADR-160 adds `HMBTN_PORT && HMBTN_ENH_SHIPPING_BIN` guards in
+`src/overlay/11_GF_FARM/people/player.c` and `player.h`. The port searches all
+active `ZONE_SHIPPING_BOX` entries within one farm tile of the player instead
+of relying on a first-match zone probe, which can hide an overlapping shipping
+  zone. The guard also stores a held stack's count in the thrown-item padding and
+  records every unit in both the standard landing-to-bin branch and the
+  supplemental proximity branch. The matching
+branch retains the original single-item shipping call and struct layout; the
+farm overlay manifest records the normalized source and header hashes.

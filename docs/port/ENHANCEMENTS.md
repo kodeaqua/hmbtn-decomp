@@ -27,8 +27,10 @@ they do not establish complete gameplay parity, all display modes, or broad
 performance. See GPU_TESTING.md and PLATFORMS.md.
 The 2026-10-31 gameplay/control batch is recorded in ADR-158 through ADR-165.
 The shipping-bin list tracks exact item variants in process memory for the
-current play session; it does not extend the original save format, so its exact
-variant list is not restored after restarting or loading a save.
+current play session, including sellable items that lack a vanilla shipment
+count slot and new items added to the portable basket. It does not extend the
+original save format, so its exact variant list is not restored after restarting
+or loading a save.
 
 ## Dated implementation history
 
