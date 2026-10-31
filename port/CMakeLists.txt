@@ -278,6 +278,24 @@ target_link_libraries(hmbtn_boot_probe PRIVATE hmbtn_game_initial hmbtn_psx_pend
 
 if(HMBTN_BUILD_GPU_SPIKE OR HMBTN_BUILD_NATIVE_WINDOW)
     include(FetchContent)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        find_program(hm_wayland_scanner NAMES wayland-scanner)
+        if(hm_wayland_scanner)
+            set(HMBTN_WAYLAND_SCANNER "${hm_wayland_scanner}")
+            set(hm_wayland_scanner_wrapper
+                "${CMAKE_CURRENT_BINARY_DIR}/host-tools/wayland-scanner-stderr.sh")
+            file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/host-tools")
+            configure_file(cmake/wayland-scanner-stderr.sh.in
+                "${hm_wayland_scanner_wrapper}" @ONLY)
+            file(CHMOD "${hm_wayland_scanner_wrapper}" PERMISSIONS
+                OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE
+                WORLD_READ WORLD_EXECUTE)
+            # SDL 3.4.18's CMake probe reads the scanner version from stderr;
+            # current Wayland scanners print it to stdout.
+            set(WAYLAND_SCANNER "${hm_wayland_scanner_wrapper}" CACHE FILEPATH
+                "Wayland scanner compatibility wrapper for SDL" FORCE)
+        endif()
+    endif()
     set(SDL_SHARED OFF CACHE BOOL "" FORCE)
     set(SDL_STATIC ON CACHE BOOL "" FORCE)
     set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)

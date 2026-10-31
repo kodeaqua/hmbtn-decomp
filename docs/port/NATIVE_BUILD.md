@@ -11,8 +11,9 @@ The playable port is built separately from the matching decompilation:
   NDK 30.0.16248370, Gradle 9.8.2 and AGP 9.5.0 built the Release APK on
   2026-11-01. That APK was not installed or launched in this build run.
 - Linux x86-64: Fedora 44 Release and ASan/UBSan builds pass 111/111 tests.
-  SDL's offscreen Vulkan probes also pass on the Intel iGPU. The executable was
-  linked, but not launched; game boot and interactive use remain unverified.
+  SDL Vulkan renderer probes pass on the Intel iGPU through Wayland in both
+  builds and through X11/XWayland in Release. The executable was linked, but not
+  launched; game boot and interactive use remain unverified.
 - macOS universal: presets exist, but no build has been validated on macOS.
 
 From the repository root:

@@ -4489,3 +4489,20 @@ field width in the camera-view unit.
 
 Consequences: Camera rotation uses the intended 32-bit GTE flag storage on
 LP64 hosts, and the matching build keeps the original declaration unchanged.
+
+## ADR-170: Adapt the Wayland Scanner Version Probe for SDL
+
+Date: 2026-11-01.
+
+Context: SDL 3.4.18's CMake check expects `wayland-scanner --version` to write
+its version to stderr. Fedora 44's scanner writes it to stdout, so SDL's summary
+reported Wayland as enabled while the generated build configuration omitted the
+Wayland video driver.
+
+Decision: On Linux native-window/GPU builds, wrap the discovered scanner. Send
+only its `--version` output to stderr and pass protocol-generation invocations
+through unchanged.
+
+Consequences: SDL compiles the Wayland driver on hosts with a Wayland scanner;
+other platforms and builds without that tool keep SDL's normal behavior. The
+generated wrapper remains in the ignored build directory.
