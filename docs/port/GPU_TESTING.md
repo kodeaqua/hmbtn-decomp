@@ -179,6 +179,20 @@ Android Release also builds, but ADB reported no connected device during this
 rerun; the ADR-165 APK has not been measured on Adreno, and rendering remains
 unverified on Mali.
 
+Live Adreno 610 baseline on 2026-10-31 (SM6225/`bengal`, 520x240 scene), before
+the native-coordinate shader optimization: the latest 12 one-second windows
+presented 15 frames each, with 48.0-53.4 ms average presentation and 44.5-49.9
+ms in `SDL_SubmitGPUCommandBuffer`; game CPU time was 7.8-9.8 ms. Scene build,
+replay, materialization and encode each remained around 1-2 ms. A 600-attempt
+coverage report showed 596/596 renderable GPU frames, zero fallback and four
+empty-display skips. Audio underflow reached 1,169,240 source frames (about
+26.5 seconds at 44.1 kHz), with zero dropped frames and a typical 735-frame
+queue; thermal status was normal. The scene shader now bypasses coordinate
+division for native-sized output. Its pixel output passes the D3D12 and Vulkan
+CPU-reference probes, and a new Android Release APK builds. The APK is not yet
+installed or measured on Adreno because the owner is actively using the current
+game session; target-device improvement remains unverified.
+
 The probe's `--farm-benchmark` option renders 8,192 fixed 8x8 rectangles at
 320x240 and 960x720, with a fresh builder and an explicit GPU fence per frame.
 On the local Windows Radeon RX Vega, D3D12 capture/upload/compute/fence time

@@ -56,9 +56,12 @@ void main(uint3 id:SV_DispatchThreadID){
     uint width=load_word(0),height=load_word(1);if(id.x>=width||id.y>=height)return;
     int2 origin=int2(load_word(2),load_word(3));uint2 logical_size=uint2(load_word(4),load_word(5));
     uint tiles_x=load_word(6),bin_table=load_word(9);
-    int2 local=int2(((2*id.xy+1)*logical_size)/(2*uint2(width,height)));
-    int2 logical=origin+local;
     bool native=(width==logical_size.x&&height==logical_size.y);
+    /* Native scenes map one compute pixel to one logical pixel exactly. Avoid
+     * two dynamic integer divisions per output pixel on mobile GPUs. */
+    int2 local=native?int2(id.xy):
+        int2(((2*id.xy+1)*logical_size)/(2*uint2(width,height)));
+    int2 logical=origin+local;
     uint filter_mode=load_word(11);bool filtering_enabled=filter_mode!=0;
     uint color=(logical.x<int(load_word(12))||logical.x>=int(load_word(12)+load_word(13)))?
         load_word(14):vram(0,logical.x,logical.y);

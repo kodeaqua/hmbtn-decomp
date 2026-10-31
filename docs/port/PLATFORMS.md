@@ -5,7 +5,7 @@
 | Target | Current validation |
 | --- | --- |
 | Windows x86-64 | Release build and 125/125 tests pass. ASan/UBSan suite passes all 125 tests. Full synthetic renderer, opcode, VRAM scanout, interpolation seam, and FXAA/MSAA probes pass with pixel comparisons on D3D12 and Vulkan. Full-playthrough parity remains unverified. |
-| Android arm64-v8a | Release APK builds with AGP 9.5.0, Gradle 9.8.2, and NDK 30.0.16248370. A prior owner-tested G100 farm sample reports 100% submitted GPU frames in two steady 600-frame windows and 60-61 presents/s at 384x240. The later Adreno 610 run showed 12-13 presents/s at 520x240; ADR-165 changes Android GPU scene filtering, but its performance is unmeasured. ADB found no connected device during the current audit, so Adreno re-test and Mali rendering remain unverified. |
+| Android arm64-v8a | Release APK builds with AGP 9.5.0, Gradle 9.8.2, and NDK 30.0.16248370. A prior owner-tested G100 farm sample reports 100% submitted GPU frames in two steady 600-frame windows and 60-61 presents/s at 384x240. The live Adreno 610 baseline at 520x240 is 15 presents/s with 44-50 ms GPU submit and substantial audio underflow. The native-coordinate shader fast path builds and passes D3D12/Vulkan reference probes; its Adreno performance is not yet measured because the owner is using the current game session. Latest Mali rendering remains unverified. |
 | Linux x86-64 | Deferred to a separate Linux host; WSL is excluded. |
 | macOS universal | No macOS build has been validated. |
 | Matching build | The check target remains unverified on this Windows host because its separate Linux toolchain is unavailable. |
