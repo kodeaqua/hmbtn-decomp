@@ -16,8 +16,9 @@ VanillaBTN uses a modern native architecture compiling directly from decompiled 
    - [Prerequisites](#android-prerequisites)
    - [Build Command](#android-build-command)
    - [Outputs](#android-outputs)
-3. [Running Tests](#running-tests)
-4. [Troubleshooting & Tips](#troubleshooting--tips)
+3. [Linux (Native x86-64)](#linux-native-x86-64)
+4. [Running Tests](#running-tests)
+5. [Troubleshooting & Tips](#troubleshooting--tips)
 
 ---
 
@@ -91,9 +92,29 @@ gradle.bat assembleRelease
 
 ---
 
+## Linux (Native x86-64)
+
+Linux x86-64 is validated on Fedora 44. Install Clang, CMake 3.24 or newer,
+Ninja, and the development/runtime dependencies for SDL3's Linux video, audio
+and Vulkan backends. From the repository root:
+
+```sh
+cd port
+cmake --preset linux-release -DHMBTN_BUILD_NATIVE_WINDOW=ON
+cmake --build --preset linux-release -j16
+ctest --preset linux-release
+```
+
+The executable is `build/port/linux-release/bin/VanillaBTN`. For memory and
+undefined-behavior checks, use the `linux-asan-ubsan` preset with the same
+commands. The owner supplies game data and handles interactive gameplay tests.
+
+---
+
 ## Running Tests
 
-VanillaBTN includes a comprehensive native unit test suite (124 tests) validating mathematical models, GTE fixed-point vectors, VRAM/GPU commands, memory card operations, and gameplay enhancements.
+VanillaBTN includes a native unit test suite for math, GTE fixed-point vectors,
+VRAM/GPU commands, memory card operations, layouts, and gameplay logic.
 
 To run the test suite:
 ```powershell

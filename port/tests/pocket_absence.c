@@ -25,7 +25,7 @@ static int write_card(void *c, int slot, const void *p, size_t n) {
     return 1;
 }
 static int complete(int expected) {
-    s32 cmd, result;
+    long cmd, result;
     return McxSync(1, &cmd, &result) == 1 && result == expected;
 }
 int main(void) {
@@ -44,7 +44,7 @@ int main(void) {
     CHECK(McxGetMem(0, bytes, 0, sizeof bytes) == 1 && complete(McxErrInvalid));
     CHECK(McxSetMem(0, bytes, 0, sizeof bytes) == 1 && complete(McxErrInvalid));
     CHECK(McxExecFlag(0, 0, 0) == 1);
-    s32 cmd, result;
+    long cmd, result;
     CHECK(McxSync(1, &cmd, &result) == 1 && cmd == McxFuncExecFlag && result == McxErrInvalid);
     CHECK(McxExecApl(0, 0, 0) == 1 && complete(McxErrInvalid));
     CHECK(McxCurrCtrl(0, 0, 0, 0) == 1 && complete(McxErrInvalid));

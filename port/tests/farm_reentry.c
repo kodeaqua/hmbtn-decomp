@@ -52,7 +52,7 @@ int main(void) {
             objects += parts[i].spans[j].bytes != 0;
             immutable += parts[i].spans[j].bytes == 0;
         }
-    CHECK(total && objects == 677 && immutable == 26);
+    CHECK(total && objects == 679 && immutable == 26);
     u8 *pristine = malloc(total);
     CHECK(pristine);
     size_t offset = 0;

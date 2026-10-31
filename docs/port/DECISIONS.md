@@ -2034,10 +2034,12 @@ pristine snapshot at host startup using the existing object-based overlay loader
 Restore each real C object on activation, preserving ASan global instrumentation.
 Do not copy linker ranges, reset the resident game state or write save files.
 
-The inventory contains 703 file-scope objects. A compiler type test skips only
-top-level const objects, correctly distinguishing mutable pointers to const data
-from immutable pointers. On the validated x64 build, 677 mutable objects occupy
-49,201 bytes and 26 objects are excluded. All 56 function-local static tables are
+The initial inventory contained 703 file-scope objects. A compiler type test
+skips only top-level const objects, correctly distinguishing mutable pointers to
+const data from immutable pointers. In the 2026-11-01 Linux x86-64 re-audit, two
+existing weather pause-random state globals were found missing. The checked
+inventory now contains 705 objects: 679 mutable objects occupying 49,209 bytes
+on Linux x86-64, and 26 const objects. All 56 function-local static tables are
 FarmCueStep arrays passed only to the read-only table consumer farm_cue_step_run;
 their unchanged contents need no restoration. Record and check that exception.
 
@@ -4471,3 +4473,19 @@ Back inputs without adding a separate on-screen button. The pause UI still uses
 the existing original-game dialog art and font. Windows and Android builds and
 their controls/pause tests must verify the renumbered settings rows and
 touch/gamepad routes.
+
+## ADR-169: Keep the Camera GTE Flag Word 32-bit on LP64
+
+Date: 2026-11-01.
+
+Context: `CameraWork.flag` is an output word for `RotTrans`, whose native
+compatibility signature writes one 32-bit GTE flag value. The original field
+uses `long`, which is 64-bit on Linux x86-64 and made the pointer incompatible
+with the runtime API.
+
+Decision: Under `HMBTN_PORT`, declare the temporary field as `s32`; keep the
+original `long` declaration in the matching-build branch. Assert the native
+field width in the camera-view unit.
+
+Consequences: Camera rotation uses the intended 32-bit GTE flag storage on
+LP64 hosts, and the matching build keeps the original declaration unchanged.

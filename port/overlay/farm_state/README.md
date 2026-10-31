@@ -6,10 +6,10 @@ CMake compiles native-only wrappers that include the unchanged original TU and
 its object inventory. Existing field/status SDK call-site definitions are copied
 to their wrappers. Source order is preserved.
 
-The checked inventory covers all 51 farm TUs and 703 file-scope objects, including
+The checked inventory covers all 51 farm TUs and 705 file-scope objects, including
 the TU-local section table defined by a shared header. C type classification
-excludes 26 top-level const objects; the 677 mutable objects total 49,201 bytes on
-the validated Windows x64 build. Copy individual C objects, never linker ranges
+excludes 26 top-level const objects; the 679 mutable objects total 49,209 bytes in
+the validated Linux x86-64 build. Copy individual C objects, never linker ranges
 or sanitizer redzones. Resident game_state, farm_area, settings and save files
 are outside this inventory.
 

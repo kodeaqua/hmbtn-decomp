@@ -6,7 +6,7 @@
 | --- | --- |
 | Windows x86-64 | Windows -Game Release build and 125/125 tests pass. The latest Windows ASan/UBSan preset passes 108/108 tests. Full synthetic renderer, opcode, VRAM scanout, interpolation seam, and FXAA/MSAA probes pass with pixel comparisons on D3D12 and Vulkan. Full-playthrough parity remains unverified. |
 | Android arm64-v8a | Release APK builds with AGP 9.5.0, Gradle 9.8.2, and NDK 30.0.16248370. Earlier owner gameplay reported smooth play on a G100 tablet; this audit did not run gameplay. An Adreno 610 performance investigation is deferred, and Mali rendering remains unverified. |
-| Linux x86-64 | Deferred to a separate Linux host; WSL is excluded. |
+| Linux x86-64 | Fedora 44 on Intel iGPU host: Release and ASan/UBSan builds pass 111/111 tests. Offscreen GPU renderer probes pass under both builds with the Intel Vulkan ICD forced. No interactive game or user disc was opened. |
 | macOS universal | No macOS build has been validated. |
 
 ### Follow-up verification (2026-11-01)
@@ -17,6 +17,20 @@ probe passed on Vulkan and Direct3D 12, including the primitive opcode sweep.
 Android Release completed with AGP 9.5.0, Gradle 9.8.2, and NDK
 30.0.16248370. The APK was not installed
 or launched during this verification run. No interactive game was opened.
+
+Linux x86-64 was brought up on Fedora 44 (Clang 22.1.8, SDL 3.4.18, kernel
+7.2.13) on the Intel iGPU (`8086:46b3`, `i915`). Release and ASan/UBSan builds
+pass 111/111 tests each. The synthetic GPU renderer probe passes under both
+builds with `intel_icd.x86_64.json` selected, covering VRAM feedback and copies,
+direct image transfers, dense scene bins, primitive opcodes and presentation
+aspect behavior. The executable links and its shared-library dependencies
+resolve. It was not launched, so title boot, audio/video output, disc selection
+and gameplay remain unverified.
+
+The same Clang AST re-audit found that two existing weather pause-random state
+globals were missing from the farm re-entry inventory. The checked inventory
+now covers 705 objects (679 mutable, 49,209 bytes; 26 const exclusions), and
+the re-entry fixture verifies their restoration. No farm source was changed.
 
 The latest gameplay changes include the Walk Crops movement-probe repair,
 shipping-bin stack and portable-basket accounting, and the one-window shipped
