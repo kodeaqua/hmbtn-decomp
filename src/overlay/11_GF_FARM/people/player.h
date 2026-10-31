@@ -245,6 +245,9 @@ void player_count_idle(FarmPlayer *player);
 s32 player_reset_pose(void);
 s32 player_show_item(FarmStoredItem *item);
 s32 player_use_held_item(s32 held);
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SHIPPING_BIN)
+s32 player_shipping_basket_begin(void);
+#endif
 /* The follow-up pose of the receive-item step, by the state it is given. */
 enum ReceiveItemState {
     RECEIVE_ITEM_HOLD = 0,          /* put in hand */
@@ -286,7 +289,11 @@ typedef struct FarmThrownItem {
     s16 timer;
     u16 phase;
     u16 dir;
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SHIPPING_BIN)
+    u16 count;          /* Stack quantity carried by the thrown item. */
+#else
     u8 pad0A[2];
+#endif
     s32 velocityY;
     s32 groundY;
     s32 vx;

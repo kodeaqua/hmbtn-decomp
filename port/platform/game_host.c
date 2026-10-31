@@ -83,10 +83,11 @@ static hm_input_replay hm_replay;
 static int hm_replay_enabled;
 static u64 hm_host_tick_limit;
 static hm_controls_options hm_controls;
+#ifdef __ANDROID__
+static u16 hm_virtual_pad_press_latch;
+#endif
 static hm_audio_options hm_audio;
 static SDL_Gamepad *hm_active_gamepad = NULL;
-static int hm_mouse_wheel_up = 0;
-static int hm_mouse_wheel_down = 0;
 static int hm_trace_camera;
 static hm_present_clock hm_presentation;
 #ifdef HMBTN_ENH_PAUSE_MENU
@@ -242,6 +243,7 @@ typedef struct {
     Uint64 submit_ns, submit_max_ns;
     u32 scenes, replays, materialized_replays, packs, encodes, acquires, blits, submits;
     u32 width, height, primitive_count, tile_count, max_bin_count;
+    u32 empty_bin_count, shared_cache_bin_count;
     u32 vram_version_count, materialization_tile_count;
     u64 total_bin_references;
     size_t scene_bytes;
@@ -355,13 +357,13 @@ static void hm_host_gpu_coverage_report(void) {
     double percent = renderable ? (100.0 * (double)hm_gpu_coverage_successes / renderable) : 0.0;
 #ifdef __ANDROID__
     __android_log_print(ANDROID_LOG_INFO, "VanillaBTN",
-                        "GPU frame coverage: %u/%u renderable (%.1f%%; %u VRAM scanouts), %u fallback, %u skipped of %u attempts; last: %s",
+                        "GPU Auto game-loop coverage: %u/%u renderable frames (%.1f%%; %u direct VRAM scanouts), %u CPU fallbacks, %u skipped of %u attempts; last: %s",
                         hm_gpu_coverage_successes, renderable, percent, hm_gpu_coverage_scanouts,
                         hm_gpu_coverage_fallbacks, hm_gpu_coverage_skipped,
                         hm_gpu_coverage_frames,
                         hm_gpu_coverage_last_reason);
 #else
-    SDL_Log("GPU frame coverage: %u/%u renderable (%.1f%%; %u VRAM scanouts), %u fallback, %u skipped of %u attempts; last: %s",
+    SDL_Log("GPU Auto game-loop coverage: %u/%u renderable frames (%.1f%%; %u direct VRAM scanouts), %u CPU fallbacks, %u skipped of %u attempts; last: %s",
             hm_gpu_coverage_successes, renderable, percent, hm_gpu_coverage_scanouts,
             hm_gpu_coverage_fallbacks, hm_gpu_coverage_skipped, hm_gpu_coverage_frames,
             hm_gpu_coverage_last_reason);
@@ -654,6 +656,8 @@ static int hm_host_gpu_present(const RECT *native_area) {
             hm_gpu_perf.primitive_count = hm_gpu_cached.primitive_count;
             hm_gpu_perf.tile_count = hm_gpu_cached.tile_count;
             hm_gpu_perf.max_bin_count = hm_gpu_cached.max_bin_count;
+            hm_gpu_perf.empty_bin_count = hm_gpu_cached.empty_bin_count;
+            hm_gpu_perf.shared_cache_bin_count = hm_gpu_cached.shared_cache_bin_count;
             hm_gpu_perf.total_bin_references = hm_gpu_cached.total_bin_references;
             hm_gpu_perf.vram_version_count = hm_gpu_cached.vram_version_count;
             hm_gpu_perf.scene_bytes = hm_gpu_cached.bytes;
@@ -764,8 +768,100 @@ static int hm_host_gpu_present(const RECT *native_area) {
 #ifdef HMBTN_ENH_PAUSE_MENU
 #ifdef HMBTN_ENH_SHIPPING_BIN
 static u16 hm_pause_shipping_ids[ITEM_COUNT];
+static u8 hm_pause_shipping_actions[ITEM_COUNT];
 static char hm_pause_shipping_text[ITEM_COUNT][32];
-static char hm_pause_rucksack_text[HM_PAUSE_RUCKSACK_ITEMS][32];
+static u32 hm_pause_item_icon_pixels[ITEM_COUNT][HM_PAUSE_ITEM_ICON_SIZE * HM_PAUSE_ITEM_ICON_SIZE];
+static u8 hm_pause_item_icon_state[ITEM_COUNT];
+static hm_vram_context hm_pause_item_icon_vram;
+
+enum { HM_PAUSE_SHIPPING_ROW_ITEM, HM_PAUSE_SHIPPING_ROW_SHIP_BASKET };
+
+static u32 hm_host_pause_icon_texel(const FarmGridEntry *entry, int page_x, int x, int y) {
+    u16 packed = hm_vram_pixel((u32)(page_x + entry->x + x / 4), (u32)(entry->y + y));
+    u16 color_index = (packed >> ((x & 3) * 4)) & 15;
+    if (color_index == 0)
+        return 0;
+    u16 color = hm_vram_pixel((u32)(entry->clutX + color_index), (u32)entry->clutY);
+    if (color == 0)
+        return 0;
+    u32 red = color & 31;
+    u32 green = (color >> 5) & 31;
+    u32 blue = (color >> 10) & 31;
+    red = (red << 3) | (red >> 2);
+    green = (green << 3) | (green >> 2);
+    blue = (blue << 3) | (blue >> 2);
+    return 0xFF000000u | (red << 16) | (green << 8) | blue;
+}
+
+/* Load a game's own 4bpp item sprite into private VRAM and cache its 16x16 icon.
+ * The farm's live picture-slot tables and VRAM are restored before returning. */
+static const u32 *hm_host_pause_item_icon(int id) {
+    if (id <= ITEM_NOTHING || id >= ITEM_COUNT)
+        return NULL;
+    if (hm_pause_item_icon_state[id] == 2)
+        return hm_pause_item_icon_pixels[id];
+    if (hm_pause_item_icon_state[id] != 0)
+        return NULL;
+    hm_pause_item_icon_state[id] = 1;
+
+    s16 saved_ids[PICTURE_ROWS][PICTURE_SLOTS];
+    FarmGridEntry saved_entries[PICTURE_ROWS][PICTURE_SLOTS];
+    memcpy(saved_ids, farm_area.mode.pictureIds, sizeof(saved_ids));
+    memcpy(saved_entries, farm_area.mode.pictureEntries, sizeof(saved_entries));
+    memset(farm_area.mode.pictureIds, 0, sizeof(farm_area.mode.pictureIds));
+    memset(farm_area.mode.pictureEntries, 0xFF, sizeof(farm_area.mode.pictureEntries));
+
+    hm_vram_context *previous_vram = hm_vram_bind(&hm_pause_item_icon_vram);
+    hm_vram_reset();
+    int loaded = picture_load_to_vram(id);
+    FarmGridEntry *picture = NULL;
+    if (loaded) {
+        for (int row = 0; row < PICTURE_ROWS && !picture; ++row) {
+            for (int slot = 0; slot < PICTURE_SLOTS; ++slot) {
+                if (farm_area.mode.pictureIds[row][slot] == id) {
+                    picture = &farm_area.mode.pictureEntries[row][slot];
+                    break;
+                }
+            }
+        }
+    }
+
+    int width = picture ? picture->w : 0;
+    int height = picture ? picture->h : 0;
+    int page_x = picture && picture->clutX >= 1008 ? 960 : 832;
+    if (width <= 0 || height <= 0) {
+        width = picture ? picture->w2 : 0;
+        height = picture ? picture->h2 : 0;
+    }
+    if (width > 0 && height > 0 && width <= 256 && height <= 256 && picture) {
+        int output_width = width >= height ? HM_PAUSE_ITEM_ICON_SIZE
+                                           : width * HM_PAUSE_ITEM_ICON_SIZE / height;
+        int output_height = height >= width ? HM_PAUSE_ITEM_ICON_SIZE
+                                            : height * HM_PAUSE_ITEM_ICON_SIZE / width;
+        if (output_width < 1) output_width = 1;
+        if (output_height < 1) output_height = 1;
+        int x_offset = (HM_PAUSE_ITEM_ICON_SIZE - output_width) / 2;
+        int y_offset = (HM_PAUSE_ITEM_ICON_SIZE - output_height) / 2;
+        for (int y = 0; y < output_height; ++y) {
+            int source_y = y * height / output_height;
+            for (int x = 0; x < output_width; ++x) {
+                int source_x = x * width / output_width;
+                hm_pause_item_icon_pixels[id][(y + y_offset) * HM_PAUSE_ITEM_ICON_SIZE +
+                                              x + x_offset] =
+                    hm_host_pause_icon_texel(picture, page_x, source_x, source_y);
+            }
+        }
+    }
+
+    memcpy(farm_area.mode.pictureIds, saved_ids, sizeof(saved_ids));
+    memcpy(farm_area.mode.pictureEntries, saved_entries, sizeof(saved_entries));
+    hm_vram_bind(previous_vram);
+    int has_pixels = 0;
+    for (int i = 0; i < HM_PAUSE_ITEM_ICON_SIZE * HM_PAUSE_ITEM_ICON_SIZE; ++i)
+        has_pixels |= hm_pause_item_icon_pixels[id][i] != 0;
+    hm_pause_item_icon_state[id] = has_pixels ? 2 : 3;
+    return has_pixels ? hm_pause_item_icon_pixels[id] : NULL;
+}
 
 static const char *hm_pause_item_name(int id) {
     static const char *const crop_names[15] = {
@@ -822,30 +918,65 @@ static const char *hm_pause_item_name(int id) {
     }
 }
 
-static int hm_host_shipping_build_rows(hm_pause_view *view) {
+static int hm_host_shipping_build_rows(hm_pause_view *view, int portable_basket) {
     int count = 0;
-    for (int id = 1; id < ITEM_COUNT && count < ITEM_COUNT; ++id) {
+    view->shipping_basket = portable_basket;
+    for (int id = 1; id < ITEM_COUNT && count < HM_PAUSE_SHIPPING_ITEMS; ++id) {
         int amount = hm_gameplay_shipping_count(id);
-        if (amount <= 0 || estate_item_slot_index(id) < 0)
+        if (amount <= 0)
             continue;
         hm_pause_shipping_ids[count] = (u16)id;
+        hm_pause_shipping_actions[count] = HM_PAUSE_SHIPPING_ROW_ITEM;
         SDL_snprintf(hm_pause_shipping_text[count], sizeof(hm_pause_shipping_text[count]),
-                     "%s x%d", hm_pause_item_name(id), amount);
+                     "%s", hm_pause_item_name(id));
         view->shipping_items[count] = hm_pause_shipping_text[count];
+        view->shipping_icons[count] = hm_host_pause_item_icon(id);
+        view->shipping_quantities[count] = amount;
+        ++count;
+    }
+    if (portable_basket && count < HM_PAUSE_SHIPPING_ITEMS) {
+        hm_pause_shipping_ids[count] = ITEM_NOTHING;
+        hm_pause_shipping_actions[count] = HM_PAUSE_SHIPPING_ROW_SHIP_BASKET;
+        SDL_snprintf(hm_pause_shipping_text[count], sizeof(hm_pause_shipping_text[count]),
+                     "Ship Basket");
+        view->shipping_items[count] = hm_pause_shipping_text[count];
+        view->shipping_icons[count] = hm_host_pause_item_icon(ITEM_BASKET);
+        view->shipping_quantities[count] = game_state.progress.estate.basket.count;
         ++count;
     }
     view->shipping_count = count;
-    for (int i = 0; i < HM_PAUSE_RUCKSACK_ITEMS; ++i) {
-        FarmStoredItem *item = i < game_state.player.itemSlots ? &game_state.player.items[i] : NULL;
-        if (!item || item->id == ITEM_NOTHING) {
-            SDL_snprintf(hm_pause_rucksack_text[i], sizeof(hm_pause_rucksack_text[i]), "Empty");
-        } else {
-            SDL_snprintf(hm_pause_rucksack_text[i], sizeof(hm_pause_rucksack_text[i]), "%s x%d",
-                         hm_pause_item_name(item->id), item->count);
-        }
-        view->rucksack_items[i] = hm_pause_rucksack_text[i];
-    }
     return count;
+}
+
+static int hm_host_shipping_slot_at(int x, int y) {
+    if (x < 92 || x >= 92 + HM_PAUSE_SHIPPING_COLUMNS * 34 || y < 54 ||
+        y >= 54 + HM_PAUSE_SHIPPING_ROWS * 34)
+        return -1;
+    int column = (x - 92) / 34;
+    int row = (y - 54) / 34;
+    return row < HM_PAUSE_SHIPPING_ROWS ? row * HM_PAUSE_SHIPPING_COLUMNS + column : -1;
+}
+
+static int hm_host_shipping_page_button_at(int x, int y) {
+    if (y < 36 || y >= 50)
+        return 0;
+    if (x >= 206 && x < 219)
+        return -1;
+    if (x >= 285 && x < 298)
+        return 1;
+    return 0;
+}
+
+static int hm_host_shipping_change_page(hm_pause_menu *menu, int count, int direction) {
+    int page_count = (count + HM_PAUSE_SHIPPING_VISIBLE_ITEMS - 1) /
+                     HM_PAUSE_SHIPPING_VISIBLE_ITEMS;
+    int page = menu->first_visible / HM_PAUSE_SHIPPING_VISIBLE_ITEMS;
+    int next_page = page + direction;
+    if (next_page < 0 || next_page >= page_count)
+        return 0;
+    menu->first_visible = next_page * HM_PAUSE_SHIPPING_VISIBLE_ITEMS;
+    menu->selected = menu->first_visible;
+    return 1;
 }
 
 static int hm_host_shipping_withdraw(int selected) {
@@ -856,7 +987,8 @@ static int hm_host_shipping_withdraw(int selected) {
         return 0;
     int bin = estate_item_slot_index(id);
     int price = item_sell_price(id);
-    if (bin < 0 || bin >= 25 || game_state.progress.estate.shipment.counts[bin] == 0 || price < 0)
+    if (price < 0 || bin >= 25 ||
+        (bin >= 0 && game_state.progress.estate.shipment.counts[bin] == 0))
         return 0;
     int slots = game_state.player.itemSlots;
     if (slots < 0 || slots > HM_PAUSE_RUCKSACK_ITEMS)
@@ -886,7 +1018,8 @@ static int hm_host_shipping_withdraw(int selected) {
     if (!destination)
         return 0;
 
-    game_state.progress.estate.shipment.counts[bin]--;
+    if (bin >= 0)
+        game_state.progress.estate.shipment.counts[bin]--;
     if (game_state.progress.estate.shipment.shippedValue >= price)
         game_state.progress.estate.shipment.shippedValue -= price;
     else
@@ -902,15 +1035,138 @@ static int hm_host_shipping_withdraw(int selected) {
 }
 #endif
 
+#ifdef __ANDROID__
+static int hm_host_pause_virtual_pad_input(SDL_Scancode scancode, hm_pause_input *input) {
+    static const SDL_Scancode keys[HM_VIRTUAL_PAD_ACTIONS] = {
+        SDL_SCANCODE_F1, SDL_SCANCODE_F2, SDL_SCANCODE_F3, SDL_SCANCODE_F4,
+        SDL_SCANCODE_F5, SDL_SCANCODE_F6, SDL_SCANCODE_F7, SDL_SCANCODE_F8,
+        SDL_SCANCODE_F9, SDL_SCANCODE_F10, SDL_SCANCODE_F11, SDL_SCANCODE_F12,
+        SDL_SCANCODE_PRINTSCREEN, SDL_SCANCODE_SCROLLLOCK};
+    if (!hm_controls.virtual_gamepad_enabled || !input)
+        return 0;
+    for (int i = 0; i < HM_VIRTUAL_PAD_ACTIONS; ++i) {
+        if (keys[i] != scancode)
+            continue;
+        switch (hm_controls.virtual_pad_mapping[i]) {
+        case 12: *input = HM_PAUSE_UP; return 1;
+        case 13: *input = HM_PAUSE_RIGHT; return 1;
+        case 14: *input = HM_PAUSE_DOWN; return 1;
+        case 15: *input = HM_PAUSE_LEFT; return 1;
+        case 6: *input = HM_PAUSE_CONFIRM; return 1;
+        case 5:
+        case 11: *input = HM_PAUSE_BACK; return 1;
+        default: return 0;
+        }
+    }
+    return 0;
+}
+#endif
+
+static int hm_host_pause_held_navigation(hm_pause_input *input) {
+    if (!input)
+        return 0;
+    if (hm_active_gamepad) {
+        if (SDL_GetGamepadButton(hm_active_gamepad, SDL_GAMEPAD_BUTTON_DPAD_UP)) {
+            *input = HM_PAUSE_UP;
+            return 1;
+        }
+        if (SDL_GetGamepadButton(hm_active_gamepad, SDL_GAMEPAD_BUTTON_DPAD_DOWN)) {
+            *input = HM_PAUSE_DOWN;
+            return 1;
+        }
+        if (SDL_GetGamepadButton(hm_active_gamepad, SDL_GAMEPAD_BUTTON_DPAD_LEFT)) {
+            *input = HM_PAUSE_LEFT;
+            return 1;
+        }
+        if (SDL_GetGamepadButton(hm_active_gamepad, SDL_GAMEPAD_BUTTON_DPAD_RIGHT)) {
+            *input = HM_PAUSE_RIGHT;
+            return 1;
+        }
+        Sint16 x = SDL_GetGamepadAxis(hm_active_gamepad, SDL_GAMEPAD_AXIS_LEFTX);
+        Sint16 y = SDL_GetGamepadAxis(hm_active_gamepad, SDL_GAMEPAD_AXIS_LEFTY);
+        if (y < -16000) {
+            *input = HM_PAUSE_UP;
+            return 1;
+        }
+        if (y > 16000) {
+            *input = HM_PAUSE_DOWN;
+            return 1;
+        }
+        if (x < -16000) {
+            *input = HM_PAUSE_LEFT;
+            return 1;
+        }
+        if (x > 16000) {
+            *input = HM_PAUSE_RIGHT;
+            return 1;
+        }
+    }
+#ifdef __ANDROID__
+    const bool *keys = SDL_GetKeyboardState(NULL);
+    static const SDL_Scancode virtual_pad_keys[HM_VIRTUAL_PAD_ACTIONS] = {
+        SDL_SCANCODE_F1, SDL_SCANCODE_F2, SDL_SCANCODE_F3, SDL_SCANCODE_F4,
+        SDL_SCANCODE_F5, SDL_SCANCODE_F6, SDL_SCANCODE_F7, SDL_SCANCODE_F8,
+        SDL_SCANCODE_F9, SDL_SCANCODE_F10, SDL_SCANCODE_F11, SDL_SCANCODE_F12,
+        SDL_SCANCODE_PRINTSCREEN, SDL_SCANCODE_SCROLLLOCK};
+    if (keys && hm_controls.virtual_gamepad_enabled) {
+        for (int i = 0; i < HM_VIRTUAL_PAD_ACTIONS; ++i) {
+            hm_pause_input candidate;
+            if (keys[virtual_pad_keys[i]] &&
+                hm_host_pause_virtual_pad_input(virtual_pad_keys[i], &candidate) &&
+                (candidate == HM_PAUSE_UP || candidate == HM_PAUSE_DOWN ||
+                 candidate == HM_PAUSE_LEFT || candidate == HM_PAUSE_RIGHT)) {
+                *input = candidate;
+                return 1;
+            }
+        }
+    }
+#endif
+    return 0;
+}
+
+static void hm_host_pause_queue_navigation(hm_pause_input input) {
+    SDL_Event event = {0};
+    event.type = SDL_EVENT_KEY_DOWN;
+    event.key.type = SDL_EVENT_KEY_DOWN;
+    event.key.windowID = SDL_GetWindowID(hm_window);
+    event.key.down = true;
+    event.key.repeat = true;
+    switch (input) {
+    case HM_PAUSE_UP:
+        event.key.key = SDLK_UP;
+        event.key.scancode = SDL_SCANCODE_UP;
+        break;
+    case HM_PAUSE_DOWN:
+        event.key.key = SDLK_DOWN;
+        event.key.scancode = SDL_SCANCODE_DOWN;
+        break;
+    case HM_PAUSE_LEFT:
+        event.key.key = SDLK_LEFT;
+        event.key.scancode = SDL_SCANCODE_LEFT;
+        break;
+    case HM_PAUSE_RIGHT:
+        event.key.key = SDLK_RIGHT;
+        event.key.scancode = SDL_SCANCODE_RIGHT;
+        break;
+    default:
+        return;
+    }
+    SDL_PushEvent(&event);
+}
+
 static void hm_host_pause(int shipping) {
     hm_host_in_pause = 1;
+#ifdef __ANDROID__
+    (void)shipping;
+#endif
     hm_pause_menu menu;
     hm_pause_open(&menu);
     menu.graphics_modern = hm_options.profile == HM_GRAPHICS_PROFILE_MODERN;
 #ifdef HMBTN_ENH_SHIPPING_BIN
+    int portable_basket = shipping == HM_SHIPPING_REQUEST_PORTABLE_BASKET;
     if (shipping) {
         menu.page = HM_PAUSE_SHIPPING;
-        menu.content_count = hm_host_shipping_build_rows(&(hm_pause_view){0});
+        menu.content_count = hm_host_shipping_build_rows(&(hm_pause_view){0}, portable_basket);
         if (menu.content_count == 0)
             menu.content_count = 1;
     }
@@ -983,6 +1239,9 @@ static void hm_host_pause(int shipping) {
     if (!hm_host_image_size(pause_width, 240))
         hm_host_fail();
     int running = 1;
+    int repeat_navigation = 0;
+    hm_pause_input repeat_direction = HM_PAUSE_UP;
+    Uint64 next_repeat_ns = 0;
     int keyboard_capture_item = -1;
     const char *notice = "";
     char value[128] = "";
@@ -992,7 +1251,7 @@ static void hm_host_pause(int shipping) {
         view.values[i] = rows[i];
 #ifdef HMBTN_ENH_SHIPPING_BIN
         if (shipping)
-            hm_host_shipping_build_rows(&view);
+            hm_host_shipping_build_rows(&view, portable_basket);
 #endif
     int value_dirty = 1;
     hm_mouse_reset();
@@ -1051,9 +1310,9 @@ static void hm_host_pause(int shipping) {
                     int vx, vy;
                     if (hm_mouse_calc_virtual_pos(event.motion.x, event.motion.y, win_w, win_h, &vx, &vy)) {
                         if (menu.page == HM_PAUSE_SHIPPING) {
-                            if (vx >= 20 && vx < 300 && vy >= 121 && vy < 188) {
-                                int row = (vy - 121) / 17;
-                                int idx = menu.first_visible + row;
+                            int slot = hm_host_shipping_slot_at(vx, vy);
+                            if (slot >= 0) {
+                                int idx = menu.first_visible + slot;
                                 if (idx < view.shipping_count && menu.selected != idx) {
                                     menu.selected = idx;
                                     value_dirty = 1;
@@ -1106,9 +1365,15 @@ static void hm_host_pause(int shipping) {
                         int vx, vy;
                         if (hm_mouse_calc_virtual_pos(event.button.x, event.button.y, win_w, win_h, &vx, &vy)) {
                             if (menu.page == HM_PAUSE_SHIPPING) {
-                                if (vx >= 20 && vx < 300 && vy >= 121 && vy < 188) {
-                                    int row = (vy - 121) / 17;
-                                    int idx = menu.first_visible + row;
+                                int page_direction = hm_host_shipping_page_button_at(vx, vy);
+                                if (page_direction != 0) {
+                                    hm_host_shipping_change_page(&menu, view.shipping_count,
+                                                                 page_direction);
+                                    continue;
+                                }
+                                int slot = hm_host_shipping_slot_at(vx, vy);
+                                if (slot >= 0) {
+                                    int idx = menu.first_visible + slot;
                                     if (idx < view.shipping_count) {
                                         menu.selected = idx;
                                         input = HM_PAUSE_CONFIRM;
@@ -1126,11 +1391,7 @@ static void hm_host_pause(int shipping) {
                                     int idx = menu.first_visible + row;
                                     if (idx < hm_pause_count(&menu)) {
                                         menu.selected = idx;
-                                        if (vx >= 192) {
-                                            input = (vx < 246) ? HM_PAUSE_LEFT : HM_PAUSE_RIGHT;
-                                        } else {
-                                            input = HM_PAUSE_CONFIRM;
-                                        }
+                                        input = hm_pause_pointer_row_input(menu.page, vx);
                                     } else {
                                         continue;
                                     }
@@ -1174,42 +1435,64 @@ static void hm_host_pause(int shipping) {
                     input = HM_PAUSE_DOWN;
                 else
                     continue;
-            } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) {
-                switch (event.key.key) {
-                case SDLK_ESCAPE:
-                case SDLK_AC_BACK:
-                case SDLK_BACKSPACE:
-                case SDLK_J:
-                    input = HM_PAUSE_BACK;
-                    break;
-                case SDLK_RETURN:
-                case SDLK_KP_ENTER:
-                case SDLK_X:
-                case SDLK_K:
-                case SDLK_SPACE:
-                    input = HM_PAUSE_CONFIRM;
-                    break;
-                case SDLK_UP:
-                case SDLK_W:
-                    input = HM_PAUSE_UP;
-                    break;
-                case SDLK_DOWN:
-                case SDLK_S:
-                    input = HM_PAUSE_DOWN;
-                    break;
-                case SDLK_LEFT:
-                case SDLK_A:
-                    input = HM_PAUSE_LEFT;
-                    break;
-                case SDLK_RIGHT:
-                case SDLK_D:
-                    input = HM_PAUSE_RIGHT;
-                    break;
-                default:
+            } else if (event.type == SDL_EVENT_KEY_DOWN) {
+                if (event.key.repeat && event.key.key != SDLK_UP && event.key.key != SDLK_DOWN &&
+                    event.key.key != SDLK_LEFT && event.key.key != SDLK_RIGHT &&
+                    event.key.key != SDLK_W && event.key.key != SDLK_A &&
+                    event.key.key != SDLK_S && event.key.key != SDLK_D)
                     continue;
+#ifdef __ANDROID__
+                if (hm_host_pause_virtual_pad_input(event.key.scancode, &input)) {
+                    /* The Android virtual pad keeps its configured PS1 mappings
+                     * while the game tick is paused inside this menu loop. */
+                } else
+#endif
+                {
+                    switch (event.key.key) {
+                    case SDLK_ESCAPE:
+                    case SDLK_AC_BACK:
+                    case SDLK_BACKSPACE:
+                    case SDLK_J:
+                        input = HM_PAUSE_BACK;
+                        break;
+                    case SDLK_RETURN:
+                    case SDLK_KP_ENTER:
+                    case SDLK_X:
+                    case SDLK_K:
+                    case SDLK_SPACE:
+                        input = HM_PAUSE_CONFIRM;
+                        break;
+                    case SDLK_UP:
+                    case SDLK_W:
+                        input = HM_PAUSE_UP;
+                        break;
+                    case SDLK_DOWN:
+                    case SDLK_S:
+                        input = HM_PAUSE_DOWN;
+                        break;
+                    case SDLK_LEFT:
+                    case SDLK_A:
+                        input = HM_PAUSE_LEFT;
+                        break;
+                    case SDLK_RIGHT:
+                    case SDLK_D:
+                        input = HM_PAUSE_RIGHT;
+                        break;
+                    default:
+                        continue;
+                    }
                 }
             } else {
                 continue;
+            }
+            if (input == HM_PAUSE_UP || input == HM_PAUSE_DOWN || input == HM_PAUSE_LEFT ||
+                input == HM_PAUSE_RIGHT) {
+                repeat_navigation = 1;
+                repeat_direction = input;
+                if (!(event.type == SDL_EVENT_KEY_DOWN && event.key.repeat))
+                    next_repeat_ns = SDL_GetTicksNS() + 350000000;
+            } else {
+                repeat_navigation = 0;
             }
             hm_pause_action action = hm_pause_handle(&menu, input);
             notice = "";
@@ -1279,25 +1562,44 @@ static void hm_host_pause(int shipping) {
             }
             if (action == HM_PAUSE_USE_BLESSING) {
                 if (menu.selected == 0) {
+                    int before = game_state.player.gold;
                     estate_gold_change(10000, 0);
-                    notice = "The Goddess added 10000G";
+                    int added = game_state.player.gold - before;
+                    notice = added <= 0 ? "Purse is already full" :
+                             (added < 10000 ? "Purse reached its limit" :
+                                              "The Goddess added 10000G");
                 } else if (menu.selected == 1) {
+                    int changed = game_state.player.stamina < game_state.player.maxStamina ||
+                                  game_state.player.fatigue > 0;
                     game_state.player.stamina = game_state.player.maxStamina;
                     game_state.player.fatigue = 0;
                     game_state.player.latches &= (u16)~(PLAYER_LATCH_STAMINA_EMPTY |
                         PLAYER_LATCH_STAMINA_UNDER_10 | PLAYER_LATCH_STAMINA_UNDER_30 |
                         PLAYER_LATCH_STAMINA_UNDER_50 | PLAYER_LATCH_FATIGUE_MAX |
                         PLAYER_LATCH_FATIGUE_80 | PLAYER_LATCH_FATIGUE_50);
-                    notice = "Your stamina and fatigue are restored";
+                    notice = changed ? "Your stamina and fatigue are restored" :
+                                       "Already fully restored";
                 } else if (menu.selected == 2) {
+                    int before = game_state.progress.estate.fodder;
                     estate_fodder_add(FODDER_ADD_BOUGHT, 10);
-                    notice = "The Goddess added 10 fodder";
+                    int added = (int)game_state.progress.estate.fodder - before;
+                    notice = added <= 0 ? "Fodder store is full" :
+                             (added < 10 ? "Fodder stock reached its limit" :
+                                           "The Goddess added 10 fodder");
                 } else if (menu.selected == 3) {
+                    int before = game_state.progress.estate.chickenFeed;
                     estate_chicken_feed_add(2, 10);
-                    notice = "The Goddess added 10 chicken feed";
+                    int added = (int)game_state.progress.estate.chickenFeed - before;
+                    notice = added <= 0 ? "Chicken feed store is full" :
+                             (added < 10 ? "Chicken feed reached its limit" :
+                                           "The Goddess added 10 chicken feed");
                 } else {
+                    int before = game_state.progress.estate.fishFood;
                     estate_fish_food_add(FISH_FOOD_ADD_AMOUNT, 10);
-                    notice = "The Goddess added 10 fish food";
+                    int added = (int)game_state.progress.estate.fishFood - before;
+                    notice = added <= 0 ? "Fish food store is full" :
+                             (added < 10 ? "Fish food reached its limit" :
+                                           "The Goddess added 10 fish food");
                 }
                 value_dirty = 1;
             }
@@ -1318,25 +1620,46 @@ static void hm_host_pause(int shipping) {
             }
 #ifdef HMBTN_ENH_SHIPPING_BIN
             if (action == HM_PAUSE_CHANGE_SHIPPING) {
-                if (menu.selected < view.shipping_count && hm_host_shipping_withdraw(menu.selected)) {
+                if (menu.selected < view.shipping_count &&
+                    hm_pause_shipping_actions[menu.selected] == HM_PAUSE_SHIPPING_ROW_SHIP_BASKET) {
+                    if (player_shipping_basket_begin())
+                        running = 0;
+                    else
+                        notice = "Basket is no longer available";
+                } else if (menu.selected < view.shipping_count &&
+                           hm_host_shipping_withdraw(menu.selected)) {
                     notice = "Item returned to rucksack";
                 } else if (view.shipping_count == 0) {
                     notice = "No shipped items to take";
                 } else {
                     notice = "Rucksack is full";
                 }
-                int count = hm_host_shipping_build_rows(&view);
+                int count = hm_host_shipping_build_rows(&view, portable_basket);
                 menu.content_count = count > 0 ? count : 1;
                 if (menu.selected >= count)
                     menu.selected = count > 0 ? count - 1 : 0;
-                if (menu.first_visible > menu.selected)
-                    menu.first_visible = menu.selected;
+                menu.first_visible = count > 0
+                                         ? (menu.selected / HM_PAUSE_SHIPPING_VISIBLE_ITEMS) *
+                                               HM_PAUSE_SHIPPING_VISIBLE_ITEMS
+                                         : 0;
                 value_dirty = 1;
             }
 #endif
         }
         if (!running)
             break;
+        hm_pause_input held_navigation;
+        if (!hm_host_pause_held_navigation(&held_navigation)) {
+            repeat_navigation = 0;
+        } else if (!repeat_navigation || held_navigation != repeat_direction) {
+            repeat_navigation = 1;
+            repeat_direction = held_navigation;
+            next_repeat_ns = SDL_GetTicksNS() + 350000000;
+            hm_host_pause_queue_navigation(held_navigation);
+        } else if (SDL_GetTicksNS() >= next_repeat_ns) {
+            hm_host_pause_queue_navigation(held_navigation);
+            next_repeat_ns = SDL_GetTicksNS() + 110000000;
+        }
         if (hm_present_clock_due(&hm_presentation, SDL_GetTicksNS())) {
             u8 *pixels = SDL_MapGPUTransferBuffer(hm_device, hm_upload, true);
             if (!pixels)
@@ -1369,13 +1692,11 @@ static void hm_host_pause(int shipping) {
                     for (int i = 0; i < HM_PAUSE_AUDIO_ITEMS; ++i)
                         hm_audio_row_value(&hm_audio, i, rows[i], sizeof(rows[i]));
                 if (menu.page == HM_PAUSE_BLESSINGS) {
-                    for (int i = 0; i < HM_PAUSE_BLESSINGS_ITEMS; ++i)
-                        snprintf(rows[i], sizeof(rows[i]), "Use");
                     value[0] = 0;
                 }
 #ifdef HMBTN_ENH_SHIPPING_BIN
                 if (menu.page == HM_PAUSE_SHIPPING) {
-                    int count = hm_host_shipping_build_rows(&view);
+                    int count = hm_host_shipping_build_rows(&view, portable_basket);
                     menu.content_count = count > 0 ? count : 1;
                     view.shipping_first = menu.first_visible;
                     if (count == 0)
@@ -1834,11 +2155,14 @@ static void hm_perf_tick_enter(Uint64 now) {
     double bin_avg = hm_gpu_perf.tile_count
                          ? (double)hm_gpu_perf.total_bin_references / hm_gpu_perf.tile_count
                          : 0;
+    u32 uncached_bin_count = hm_gpu_perf.tile_count - hm_gpu_perf.empty_bin_count -
+                             hm_gpu_perf.shared_cache_bin_count;
     hm_audio_output_stats audio_stats;
     hm_audio_output_get_stats(&audio_stats);
     char gpu_detail[512];
     snprintf(gpu_detail, sizeof(gpu_detail),
-             " | scene=%ux%u p=%u bins=%u refs=%.1f/%u vram=%u %.1fKiB matTiles=%u"
+             " | scene=%ux%u p=%u bins=%u refs=%.1f/%u cache=%u empty=%u uncached=%u"
+             " vram=%u %.1fKiB matTiles=%u"
              " | ms scene=%.1f/%.1f replay=%.1f/%.1f mat=%.1f/%.1f"
              " matSetup=%.1f/%.1f matMask=%.1f/%.1f matBind=%.1f/%.1f"
              " matReplay=%.1f/%.1f pack=%.1f/%.1f"
@@ -1846,6 +2170,8 @@ static void hm_perf_tick_enter(Uint64 now) {
              " audio=%llu/%llu q=%u",
              hm_gpu_perf.width, hm_gpu_perf.height, hm_gpu_perf.primitive_count,
              hm_gpu_perf.tile_count, bin_avg, hm_gpu_perf.max_bin_count,
+             hm_gpu_perf.shared_cache_bin_count, hm_gpu_perf.empty_bin_count,
+             uncached_bin_count,
              hm_gpu_perf.vram_version_count,
              (double)hm_gpu_perf.scene_bytes / 1024.0,
              hm_gpu_perf.materialization_tile_count,
@@ -1953,25 +2279,24 @@ static void hm_host_poll_events(void) {
             exit(0);
         }
         hm_host_display_event(event.type);
-        /* ADR-136: mouse/touch-to-game interaction is disabled.
-         * Do not feed button events into the mouse_input state machine so
-         * that all hm_mouse_consume_*() calls in overlay code return 0. */
-        if (0 && event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
-            if (event.button.button == SDL_BUTTON_LEFT)
-                hm_mouse_button_down(HM_MOUSE_BTN_LEFT);
-            else if (event.button.button == SDL_BUTTON_RIGHT)
-                hm_mouse_button_down(HM_MOUSE_BTN_RIGHT);
-        } else if (0 && event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
-            if (event.button.button == SDL_BUTTON_LEFT)
-                hm_mouse_button_up(HM_MOUSE_BTN_LEFT);
-            else if (event.button.button == SDL_BUTTON_RIGHT)
-                hm_mouse_button_up(HM_MOUSE_BTN_RIGHT);
-        } else if (0 && event.type == SDL_EVENT_MOUSE_WHEEL) {
-            if (event.wheel.y > 0)
-                hm_mouse_wheel(1);
-            else if (event.wheel.y < 0)
-                hm_mouse_wheel(-1);
+#ifdef __ANDROID__
+        if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
+            hm_controls.virtual_gamepad_enabled) {
+            static const SDL_Scancode virtual_pad_keys[HM_VIRTUAL_PAD_ACTIONS] = {
+                SDL_SCANCODE_F1, SDL_SCANCODE_F2, SDL_SCANCODE_F3, SDL_SCANCODE_F4,
+                SDL_SCANCODE_F5, SDL_SCANCODE_F6, SDL_SCANCODE_F7, SDL_SCANCODE_F8,
+                SDL_SCANCODE_F9, SDL_SCANCODE_F10, SDL_SCANCODE_F11, SDL_SCANCODE_F12,
+                SDL_SCANCODE_PRINTSCREEN, SDL_SCANCODE_SCROLLLOCK};
+            for (int i = 0; i < HM_VIRTUAL_PAD_ACTIONS; ++i) {
+                if (event.key.scancode == virtual_pad_keys[i]) {
+                    int action = hm_controls.virtual_pad_mapping[i];
+                    if (action >= 0 && action < 16)
+                        hm_virtual_pad_press_latch |= (u16)(1u << action);
+                    break;
+                }
+            }
         }
+#endif
         if (event.type == SDL_EVENT_GAMEPAD_ADDED) {
             if (!hm_active_gamepad)
                 hm_active_gamepad = SDL_OpenGamepad(event.gdevice.which);
@@ -1980,11 +2305,6 @@ static void hm_host_poll_events(void) {
                 SDL_CloseGamepad(hm_active_gamepad);
                 hm_active_gamepad = NULL;
             }
-        } else if (event.type == SDL_EVENT_MOUSE_WHEEL) {
-            if (event.wheel.y > 0)
-                hm_mouse_wheel_up = 4;
-            else if (event.wheel.y < 0)
-                hm_mouse_wheel_down = 4;
         }
 #ifdef HMBTN_ENH_PAUSE_MENU
         if (hm_pause_enabled && event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
@@ -1993,19 +2313,19 @@ static void hm_host_poll_events(void) {
 #endif
     }
 #ifdef HMBTN_ENH_SHIPPING_BIN
-    if (hm_pause_enabled && hm_gameplay_shipping_take_request())
-        hm_host_pause(1);
+    if (hm_pause_enabled) {
+        int shipping_request = hm_gameplay_shipping_take_request();
+        if (shipping_request != HM_SHIPPING_REQUEST_NONE) {
+            hm_host_pause(shipping_request);
+        }
+    }
 #endif
 }
 
 static void hm_host_events(void) {
     int current_win_w = 0, current_win_h = 0;
-    /* PORT: On Android, SDL3 reports touch-synthesised mouse events in physical
-     * pixels, while SDL_GetWindowSize returns logical dp units.  Use
-     * SDL_GetWindowSizeInPixels so hm_mouse_calc_virtual_pos receives a matching
-     * denominator and the 320x240 virtual-canvas mapping stays precise on
-     * high-DPI Android devices.  On all other platforms logical window size is
-     * correct because SDL mouse events are already in logical coords (ADR-135). */
+    /* Keep pointer input out of gameplay. Pause navigation converts pointer
+     * coordinates locally inside hm_host_pause(). */
 #ifdef __ANDROID__
     if (SDL_GetWindowSizeInPixels(hm_window, &current_win_w, &current_win_h) &&
         current_win_w > 0 && current_win_h > 0) {
@@ -2016,9 +2336,6 @@ static void hm_host_events(void) {
 #if defined(HMBTN_ENH_WIDESCREEN) && defined(HMBTN_ENH_PAUSE_MENU)
         hm_widescreen_configure(hm_options.widescreen, current_win_w, current_win_h);
 #endif
-        float current_mx = 0.0f, current_my = 0.0f;
-        SDL_GetMouseState(&current_mx, &current_my);
-        hm_mouse_update_pos(current_mx, current_my, current_win_w, current_win_h);
     }
     hm_host_poll_events();
 }
@@ -2185,42 +2502,6 @@ static void hm_host_tick(void *context, u64 tick) {
         if (SDL_GetGamepadButton(hm_active_gamepad, SDL_GAMEPAD_BUTTON_BACK))
             held |= HM_PAD_SELECT;
     }
-    /* ADR-136: Mouse/touch-to-game interaction disabled. */
-    if (0 && hm_controls.mouse_mode != HM_MOUSE_MODE_OFF) {
-        int menu_open = (game_state.globalFlags & GLOBAL_FLAG_MENU_OPEN) ||
-                        (game_state.system.menuState != MENU_STATE_IDLE);
-        if (!menu_open) {
-            float mx, my;
-            Uint32 mbuttons = SDL_GetMouseState(&mx, &my);
-        if (mbuttons & SDL_BUTTON_LMASK)
-            held |= HM_PAD_CROSS;
-        if (mbuttons & SDL_BUTTON_RMASK)
-            held |= HM_PAD_SQUARE;
-        if (mbuttons & SDL_BUTTON_MMASK)
-            held |= HM_PAD_TRIANGLE;
-        if (hm_mouse_wheel_up > 0) {
-            held |= HM_PAD_R1;
-            hm_mouse_wheel_up--;
-        }
-        if (hm_mouse_wheel_down > 0) {
-            held |= HM_PAD_R2;
-            hm_mouse_wheel_down--;
-        }
-        if (hm_controls.mouse_mode == HM_MOUSE_MODE_MOVE && (mbuttons & SDL_BUTTON_LMASK)) {
-            int win_w = 0, win_h = 0;
-            if (SDL_GetWindowSize(hm_window, &win_w, &win_h) && win_w > 0 && win_h > 0) {
-                float center_x = win_w * 0.5f;
-                float center_y = win_h * 0.5f;
-                float dx = mx - center_x;
-                float dy = my - center_y;
-                if (dx > 40.0f) held |= HM_PAD_RIGHT;
-                if (dx < -40.0f) held |= HM_PAD_LEFT;
-                if (dy > 40.0f) held |= HM_PAD_DOWN;
-                if (dy < -40.0f) held |= HM_PAD_UP;
-            }
-        }
-        }
-    }
 #ifdef __ANDROID__
     const bool *android_keys = SDL_GetKeyboardState(NULL);
     static const SDL_Scancode virtual_pad_keys[HM_VIRTUAL_PAD_ACTIONS] = {
@@ -2233,6 +2514,10 @@ static void hm_host_tick(void *context, u64 tick) {
         if (android_keys[virtual_pad_keys[i]] && action >= 0 && action < 16)
             held |= (u16)(1u << action);
     }
+    /* Preserve short touch taps whose key-down and key-up arrive between
+     * successive fixed-rate game input samples. */
+    held |= hm_virtual_pad_press_latch;
+    hm_virtual_pad_press_latch = 0;
 #endif
     if (hm_replay_enabled)
         held = hm_input_replay_sample(&hm_replay, tick);
@@ -2329,11 +2614,9 @@ int hm_game_host_start(hm_disc *disc) {
         }
     }
     hm_device = hm_create_gpu_device();
-#ifdef __ANDROID__
-    Uint32 allowed_frames_in_flight = 3;
-#else
+    /* Keep at most two frames in flight across all targets to cap input latency
+     * and follow the presentation contract in ADR-121. */
     Uint32 allowed_frames_in_flight = 2;
-#endif
     if (!hm_window || !hm_device || !SDL_ClaimWindowForGPUDevice(hm_device, hm_window) ||
         !SDL_SetGPUAllowedFramesInFlight(hm_device, allowed_frames_in_flight)) {
 #if defined(__ANDROID__)

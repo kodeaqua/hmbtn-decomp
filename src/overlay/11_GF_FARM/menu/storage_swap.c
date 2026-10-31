@@ -321,14 +321,16 @@ static void storage_swap_screen(void) {
         }
 
         window_frame_draw_at(box_ot, 1, box_x, box_y, box_w, box_h);
-        picture_cell_build_prim(src_it->id, 0, elem_ot, box_x + 22, box_y + 28, PICTURE_CELL_CENTER);
+        /* PORT: Center the item in the left 32-pixel cell of the quantity dialog. */
+        picture_cell_build_prim(src_it->id, 0, elem_ot, box_x + 8, box_y + 12, PICTURE_CELL_CENTER);
         ui_draw_icon_0d_phase(elem_ot, box_x + 44, box_y + 20);
         p = text_format_number(storage_swap_qty_cur, num_buf, 2);
-        *p++ = 0x20;
-        *p++ = '/';
-        *p++ = 0x20;
+        *p++ = TEXT_CODE_SPACE;
+        *p++ = 0x002E; /* PORT: Lowercase 'o' in the game's glyph encoding. */
+        *p++ = 0x0025; /* PORT: Lowercase 'f' in the game's glyph encoding. */
+        *p++ = TEXT_CODE_SPACE;
         p = text_format_number(storage_swap_qty_max, p, 2);
-        *p = 0xFFFF;
+        *p = TEXT_END;
         text_draw_plain(elem_ot, num_buf, box_x + 58, box_y + 20);
         ui_draw_icon_0c_phase(elem_ot, box_x + 116, box_y + 20);
         return;

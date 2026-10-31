@@ -234,7 +234,7 @@ void hm_gameplay_value(const hm_gameplay_options *options, int item, char *text,
         snprintf(text, capacity, "Farm outdoor clock advances at half speed");
         break;
     case HM_GAMEPLAY_SHIPPING_BIN_INDEX:
-        snprintf(text, capacity, "Open shipped items and take them back before Zack");
+        snprintf(text, capacity, "X at shipping box; Square with basket");
         break;
     default:
         text[0] = 0;

@@ -112,6 +112,20 @@ static void hm_text_font(const u16 *font, const char *text, int x, int y) {
 static void hm_text(const hm_pause_assets *assets, const char *text, int x, int y) {
     hm_text_font(assets ? assets->font : NULL, text, x, y);
 }
+static void hm_text_limited(const hm_pause_assets *assets, const char *text, int x, int y,
+                            size_t max_chars) {
+    if (!text)
+        return;
+    char clipped[40];
+    size_t length = strlen(text);
+    if (length > max_chars)
+        length = max_chars;
+    if (length >= sizeof(clipped))
+        length = sizeof(clipped) - 1;
+    memcpy(clipped, text, length);
+    clipped[length] = '\0';
+    hm_text(assets, clipped, x, y);
+}
 static void hm_center_font(const u16 *font, const char *text, int y) {
     if (!text || !font)
         return;
@@ -123,6 +137,66 @@ static void hm_center_font(const u16 *font, const char *text, int y) {
 static void hm_center(const hm_pause_assets *assets, const char *text, int y) {
     hm_center_font(assets ? assets->font : NULL, text, y);
 }
+static void hm_item_icon(const u32 *pixels, int x, int y) {
+    if (!pixels)
+        return;
+    for (int py = 0; py < HM_PAUSE_ITEM_ICON_SIZE; ++py) {
+        for (int px = 0; px < HM_PAUSE_ITEM_ICON_SIZE; ++px) {
+            u32 color = pixels[py * HM_PAUSE_ITEM_ICON_SIZE + px];
+            if ((color >> 24) == 0)
+                continue;
+            u8 *dst = hm_canvas + ((size_t)(y + py) * 320 + (size_t)(x + px)) * 4;
+            dst[0] = (u8)(color >> 16);
+            dst[1] = (u8)(color >> 8);
+            dst[2] = (u8)color;
+            dst[3] = 255;
+        }
+    }
+}
+static void hm_pause_button_icon(int x, int y, int cross) {
+    const u32 shadow = 0x00382A22;
+    const u32 outline = 0x00F0D7A0;
+    const u32 fill = cross ? 0x005B94D0 : 0x00D45D69;
+    if (cross) {
+        for (int i = 1; i < 10; ++i) {
+            for (int thickness = -1; thickness <= 1; ++thickness) {
+                hm_put(x + i + thickness + 1, y + i + 1, shadow);
+                hm_put(x + 10 - i + thickness + 1, y + i + 1, shadow);
+                hm_put(x + i + thickness, y + i, outline);
+                hm_put(x + 10 - i + thickness, y + i, outline);
+            }
+            hm_put(x + i, y + i, fill);
+            hm_put(x + 10 - i, y + i, fill);
+        }
+    } else {
+        for (int dy = -5; dy <= 5; ++dy) {
+            for (int dx = -5; dx <= 5; ++dx) {
+                int radius = dx * dx + dy * dy;
+                if (radius >= 13 && radius <= 34) {
+                    hm_put(x + 5 + dx + 1, y + 5 + dy + 1, shadow);
+                    hm_put(x + 5 + dx, y + 5 + dy, outline);
+                    if (radius >= 18 && radius <= 26)
+                        hm_put(x + 5 + dx, y + 5 + dy, fill);
+                }
+            }
+        }
+    }
+}
+static void hm_pause_page_arrow(int x, int y, int direction) {
+    const u32 shadow = 0x00382A22;
+    const u32 outline = 0x00F0D7A0;
+    const u32 fill = 0x00D49B46;
+    for (int row = -4; row <= 4; ++row) {
+        int distance = row < 0 ? -row : row;
+        int start = direction < 0 ? x + distance : x;
+        int end = direction < 0 ? x + 4 : x + 4 - distance;
+        for (int px = start; px <= end; ++px) {
+            int edge = row == -4 || row == 4 || px == start || px == end;
+            hm_put(px + 1, y + row + 1, shadow);
+            hm_put(px, y + row, edge ? outline : fill);
+        }
+    }
+}
 void hm_pause_draw(const hm_pause_assets *assets, u8 *rgba, const hm_pause_menu *menu,
                    const hm_pause_view *view) {
     /* The host supplies a fresh frozen background each presentation. Apply a
@@ -132,30 +206,56 @@ void hm_pause_draw(const hm_pause_assets *assets, u8 *rgba, const hm_pause_menu 
             rgba[pixel * 4 + channel] = (u8)((u32)rgba[pixel * 4 + channel] * 3 / 5);
     hm_canvas = rgba;
     if (menu->page == HM_PAUSE_SHIPPING) {
-        hm_pause_original_frame(NULL, 12, 8, 296, 82);
-        hm_center(assets, "Rucksack", 14);
-        for (int i = 0; i < HM_PAUSE_RUCKSACK_ITEMS; ++i) {
-            int x = (i < 4) ? 24 : 168;
-            int y = 34 + (i % 4) * 13;
-            hm_text(assets, view ? view->rucksack_items[i] : NULL, x, y);
+        /* Reuse the original window frame and 4-by-2 item-slot layout. */
+        hm_pause_original_frame(NULL, 25, 16, 270, 210);
+        hm_center(assets, "Shipped Items", 20);
+        int shipping_count = view ? view->shipping_count : 0;
+        int page_count = (shipping_count + HM_PAUSE_SHIPPING_VISIBLE_ITEMS - 1) /
+                         HM_PAUSE_SHIPPING_VISIBLE_ITEMS;
+        if (page_count < 1)
+            page_count = 1;
+        char page_text[24];
+        snprintf(page_text, sizeof(page_text), "%d of %d",
+                 menu->first_visible / HM_PAUSE_SHIPPING_VISIBLE_ITEMS + 1, page_count);
+        hm_text_limited(assets, page_text, 220, 38, 8);
+        if (page_count > 1) {
+            int page = menu->first_visible / HM_PAUSE_SHIPPING_VISIBLE_ITEMS;
+            if (page > 0)
+                hm_pause_page_arrow(207, 39, -1);
+            if (page + 1 < page_count)
+                hm_pause_page_arrow(286, 39, 1);
         }
-        hm_pause_original_frame(NULL, 12, 94, 296, 104);
-        hm_center(assets, "Shipped Items", 100);
-        int first = menu->first_visible;
-        for (int row = 0; row < 4; ++row) {
-            int index = first + row;
-            int y = 124 + row * 17;
-            if (index >= (view ? view->shipping_count : 0))
-                break;
-            if (index == menu->selected)
-                hm_pause_original_frame(NULL, 20, y - 3, 280, 16);
-            hm_text(assets, view->shipping_items[index], 30, y);
+        if (shipping_count > 0 && menu->selected < shipping_count) {
+            char selected_item[40];
+            snprintf(selected_item, sizeof(selected_item), "%s - %dx",
+                     view->shipping_items[menu->selected],
+                     view->shipping_quantities[menu->selected]);
+            hm_center(assets, selected_item, 137);
         }
-        if (!view || view->shipping_count == 0)
-            hm_center(assets, "No shipped items", 142);
-        hm_pause_original_frame(NULL, 12, 202, 296, 30);
-        hm_text(assets, "X Take    Up Down Select", 28, 207);
-        hm_text(assets, "ESC Close", 28, 219);
+        for (int slot = 0; slot < HM_PAUSE_SHIPPING_VISIBLE_ITEMS; ++slot) {
+            int index = menu->first_visible + slot;
+            int x = 92 + (slot % HM_PAUSE_SHIPPING_COLUMNS) * 34;
+            int y = 54 + (slot / HM_PAUSE_SHIPPING_COLUMNS) * 34;
+            if (index < shipping_count && index == menu->selected)
+                hm_pause_original_frame(NULL, x - 1, y - 1, 34, 34);
+            hm_pause_original_frame(NULL, x, y, 32, 32);
+            if (index >= shipping_count)
+                continue;
+            hm_item_icon(view->shipping_icons[index], x, y);
+            if (view->shipping_quantities[index] > 1) {
+                char quantity[8];
+                snprintf(quantity, sizeof(quantity), "%d",
+                         view->shipping_quantities[index] > 99 ? 99 :
+                                                                 view->shipping_quantities[index]);
+                hm_text_limited(assets, quantity, x + 4, y + 20, 2);
+            }
+        }
+        hm_center(assets, view && view->shipping_basket ? "Tap an item to take or ship basket"
+                                                        : "Tap an item to take", 161);
+        hm_pause_button_icon(106, 190, 1);
+        hm_text(assets, "Take", 121, 190);
+        hm_pause_button_icon(173, 190, 0);
+        hm_text(assets, "Close", 188, 190);
     } else if (menu->page == HM_PAUSE_GRAPHICS || menu->page == HM_PAUSE_GAMEPLAY ||
         menu->page == HM_PAUSE_CONTROLS || menu->page == HM_PAUSE_AUDIO ||
         menu->page == HM_PAUSE_BLESSINGS) {
@@ -182,14 +282,18 @@ void hm_pause_draw(const hm_pause_assets *assets, u8 *rgba, const hm_pause_menu 
             if (i == menu->selected)
                 hm_text(assets, "-", 26, y);
             hm_text(assets, hm_pause_label(menu, i), 40, y);
-            if (view && view->values[i])
+            if (menu->page != HM_PAUSE_BLESSINGS && view && view->values[i])
                 hm_text(assets, view->values[i], 192, y);
         }
         hm_pause_original_frame(NULL, 12, 200, 296, 32);
         hm_text(assets, view ? view->detail : NULL, 24, 205);
-        hm_text(assets,
-                view && view->notice && *view->notice ? view->notice : "Left Right Change   ESC Back",
-                24, 218);
+        const char *footer = view && view->notice && *view->notice ? view->notice :
+#ifdef __ANDROID__
+                             "Tap rows; Cross select Circle back";
+#else
+                             "D-pad/Arrows K select Esc/J back";
+#endif
+        hm_text_limited(assets, footer, 24, 218, 34);
     } else {
         int root = menu->page == HM_PAUSE_ROOT;
         int top = root ? 54 : 38;
@@ -209,8 +313,15 @@ void hm_pause_draw(const hm_pause_assets *assets, u8 *rgba, const hm_pause_menu 
         }
         const u16 *font_prompt =
             assets && assets->font_light[0] ? assets->font_light : (assets ? assets->font : NULL);
-        hm_center_font(font_prompt, "Enter or X Confirm", 202);
-        hm_center_font(font_prompt, root ? "ESC Resume" : "ESC Back", 218);
+#ifdef __ANDROID__
+        hm_center_font(font_prompt, "Tap row / D-pad move", 202);
+        hm_center_font(font_prompt, root ? "Cross Select  Circle Resume"
+                                         : "Cross Select  Circle Back", 218);
+#else
+        hm_center_font(font_prompt, "D-pad/Arrows/WASD Move", 202);
+        hm_center_font(font_prompt, root ? "Enter/K Select  Esc/J Resume"
+                                         : "Enter/K Select  Esc/J Back", 218);
+#endif
     }
     hm_canvas = NULL;
 }

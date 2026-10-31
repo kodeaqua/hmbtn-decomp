@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 static u8 canvas[320 * 240 * 4];
+static u8 blessing_reference[sizeof(canvas)];
 static hm_pause_assets assets;
 int main(void) {
     hm_pause_menu menu;
@@ -47,6 +48,21 @@ int main(void) {
     const u8 *decimal = canvas + (169 * 320 + 208) * 4;
     if (fps_label[0] != 255 || fps_value[0] != 255 || decimal[0] != 255 || decimal[1] != 0) {
         fprintf(stderr, "Scrolled FPS option is outside the visible menu\n");
+        return 1;
+    }
+    menu.page = HM_PAUSE_BLESSINGS;
+    menu.selected = 1;
+    menu.first_visible = 0;
+    hm_pause_view blessings_with_values = {
+        .values = {"Use", "Use", "Use", "Use", "Use"}, .detail = "", .notice = ""};
+    hm_pause_view blessings_without_values = {.detail = "", .notice = ""};
+    memset(canvas, 0x11, sizeof(canvas));
+    hm_pause_draw(&assets, canvas, &menu, &blessings_with_values);
+    memcpy(blessing_reference, canvas, sizeof(canvas));
+    memset(canvas, 0x11, sizeof(canvas));
+    hm_pause_draw(&assets, canvas, &menu, &blessings_without_values);
+    if (memcmp(blessing_reference, canvas, sizeof(canvas))) {
+        fprintf(stderr, "Blessing actions overlap a settings value column\n");
         return 1;
     }
     return 0;
