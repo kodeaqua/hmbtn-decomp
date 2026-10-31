@@ -35,7 +35,7 @@ Requirements derived from `Dockerfile`, `cmake/`, `tools/`, and the old workflow
 | --- | --- | --- |
 | GCC cpp/cc1 | 2.95.2 PSX, old-gcc release 0.17 | GitHub decompals/old-gcc; SHA-256 below |
 | PSY-Q runtime | 4.7 | Owner-provided local zip; SHA-256 below |
-| MIPS binutils | `mips-linux-gnu-{as,ld,objcopy}` | Host distribution package; upstream did not pin a version |
+| MIPS binutils | `mips-linux-gnu-{as,ld,objcopy}`; Fedora `binutils-mips64-linux-gnu` is adapted by the setup script to O32/ELF32 little-endian | Host distribution package; upstream did not pin a version |
 | Python | minimum 3.10; reference image used 3.14 | Standard library only; no pip packages found |
 | CMake | minimum 3.20 matching, 3.24 port | Host distribution package; reference did not pin patch version |
 | Ninja | reference distribution package | Upstream did not pin version |
@@ -50,12 +50,29 @@ Archive hashes, preserved from the reference Dockerfile:
 e3df241adde663fba1f5bff1f0070e0d32d9518ebb11d60a914e5e016f704745  psyq-4.7.zip
 ```
 
-On a provisioned Linux host, from the repository root:
+On a native Linux x86-64 host, install Python 3.10+, CMake 3.20+, Ninja,
+curl, tar, `sha256sum`, and MIPS binutils. Ubuntu/Debian package names:
+
+```sh
+sudo apt install python3 cmake ninja-build curl tar coreutils binutils-mips-linux-gnu
+```
+
+Fedora package names:
+
+```sh
+sudo dnf install python3 cmake ninja-build curl tar coreutils binutils-mips64-linux-gnu
+```
+
+The Fedora cross-binutils use a `mips64-linux-gnu-` command prefix. Setup checks
+that the installed linker supports `elf32ltsmip` and generates local wrappers in
+the ignored `build/` tree, forcing the assembler to ABI32 and the linker to
+little-endian ELF32. Standard `mips-linux-gnu-` tools are used directly.
+
+From the repository root, provide your local PSY-Q 4.7 archive:
 
 ```sh
 PSYQ_ARCHIVE=/path/to/your/runtime-4.7.zip bash tools/setup-native.sh
-cmake -S . -B build/match -G Ninja
-cmake --build build/match --target check
+cmake --build build/match --target check -j16
 ```
 
 Setup checks the local SDK archive and downloads only the checksum-pinned GCC

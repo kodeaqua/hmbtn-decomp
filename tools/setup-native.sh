@@ -3,12 +3,51 @@
 set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 if [[ $(uname -s) != Linux || $(uname -m) != x86_64 ]]; then
-    echo 'Matching setup requires Linux x86-64 (or a working Ubuntu WSL distribution).' >&2
+    echo 'Matching setup requires a native Linux x86-64 host.' >&2
     exit 1
 fi
-for tool in python3 cmake ninja curl sha256sum tar mips-linux-gnu-as mips-linux-gnu-ld mips-linux-gnu-objcopy; do
+for tool in python3 cmake ninja curl sha256sum tar; do
     command -v "$tool" >/dev/null || { echo "Missing host tool: $tool" >&2; exit 1; }
 done
+
+binutils_prefix=mips-linux-gnu-
+if ! command -v "${binutils_prefix}as" >/dev/null ||
+   ! command -v "${binutils_prefix}ld" >/dev/null ||
+   ! command -v "${binutils_prefix}objcopy" >/dev/null; then
+    fedora_as=$(command -v mips64-linux-gnu-as || true)
+    fedora_ld=$(command -v mips64-linux-gnu-ld || true)
+    fedora_objcopy=$(command -v mips64-linux-gnu-objcopy || true)
+    if [[ -z $fedora_as || -z $fedora_ld || -z $fedora_objcopy ]]; then
+        echo 'Missing MIPS binutils. Install mips-linux-gnu-{as,ld,objcopy} or Fedora binutils-mips64-linux-gnu.' >&2
+        exit 1
+    fi
+
+    ld_emulations=$("$fedora_ld" -V 2>&1 || true)
+    if [[ $ld_emulations != *elf32ltsmip* ]]; then
+        echo 'Fedora MIPS linker must provide the elf32ltsmip emulation.' >&2
+        exit 1
+    fi
+
+    wrapper_dir="$root/build/native-tools/fedora-mips-binutils"
+    mkdir -p "$wrapper_dir"
+    write_binutils_wrapper() {
+        local output=$1
+        shift
+        printf '#!/usr/bin/env bash\nexec' > "$output"
+        printf ' %q' "$@" >> "$output"
+        printf ' "$@"\n' >> "$output"
+        chmod u+x "$output"
+    }
+    write_binutils_wrapper "$wrapper_dir/mips-linux-gnu-as" "$fedora_as" -mabi=32
+    write_binutils_wrapper "$wrapper_dir/mips-linux-gnu-ld" "$fedora_ld" -m elf32ltsmip
+    write_binutils_wrapper "$wrapper_dir/mips-linux-gnu-objcopy" "$fedora_objcopy"
+    binutils_prefix="$wrapper_dir/mips-linux-gnu-"
+fi
+
+for tool in "${binutils_prefix}as" "${binutils_prefix}ld" "${binutils_prefix}objcopy"; do
+    command -v "$tool" >/dev/null || { echo "Missing MIPS tool: $tool" >&2; exit 1; }
+done
+
 sdk_archive=${PSYQ_ARCHIVE:-}
 if [[ ! -f $sdk_archive ]]; then
     echo 'Set PSYQ_ARCHIVE to your local Runtime Library 4.7 zip (see docs/port/NATIVE_BUILD.md).' >&2
@@ -45,6 +84,7 @@ PY
 chmod u+x "$root/sdk/gcc-2.95.2/cpp" "$root/sdk/gcc-2.95.2/cc1"
 cmake -S "$root" -B "$root/build/match" -G Ninja \
     -DPSX_GCC_DIR="$root/sdk/gcc-2.95.2" \
+    -DPSX_BINUTILS_PREFIX="$binutils_prefix" \
     -DPSYQ_SDK_DIR="$root/sdk/psyq-4.7" \
     -DPSYQ_INCLUDE_DIR="$root/sdk/include"
-echo 'Ready: cmake --build build/match --target check'
+echo 'Ready: cmake --build build/match --target check -j16'
