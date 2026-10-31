@@ -18,6 +18,12 @@ int main(int argc, char **argv) {
     hm_graphics_value(&options, 3, detail, sizeof(detail));
     CHECK(!strcmp(row, "640 x 480") && !strcmp(row, detail));
     CHECK(options.antialiasing==HM_AA_OFF);
+    options.linear = 1;
+    CHECK(hm_graphics_scene_filter_mode(&options, 0) == 1);
+    CHECK(hm_graphics_scene_filter_mode(&options, 1) == 0);
+    options.linear = 2;
+    CHECK(hm_graphics_scene_filter_mode(&options, 1) == 2);
+    options.linear = 0;
     hm_graphics_profile_set(&options, HM_GRAPHICS_PROFILE_MODERN);
     for(int mode=HM_AA_OFF;mode<HM_AA_COUNT;++mode) {
         options.antialiasing=mode;

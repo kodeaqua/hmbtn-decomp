@@ -23,8 +23,10 @@ override this one for their subtree.
   slowdown on tablets, especially Adreno, Android Native PS1, Enhance PS1, and
   Modern profiles must keep native internal scene resolution. Modern may retain
   its 16:9 viewport and bilinear presentation; do not enable internal viewport
-  scaling in Android profiles. This supersedes ADR-163. Windows scaling remains
-  unchanged.
+  scaling in Android profiles. Android GPU scene filtering must follow the
+  CPU mobile path: nearest texture sampling for Bilinear mode, while the final
+  presentation may remain bilinear (ADR-165). These decisions supersede ADR-163.
+  Windows scaling and filtering remain unchanged.
 
 - Prioritize Windows x86-64 native bring-up before Linux, macOS, and Android.
   Phase 1 targets Windows; retain the portable architecture for the other targets.

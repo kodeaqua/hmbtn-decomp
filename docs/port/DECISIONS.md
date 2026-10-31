@@ -4382,3 +4382,24 @@ reducing compute and memory bandwidth on mobile GPUs. The Windows scaling option
 is unchanged. Android image sharpness and performance should be checked on the
 owner's tablet and Adreno device; agents must not claim a measured improvement
 without device timings.
+
+## ADR-165: Avoid Bilinear Texture Sampling in Android GPU Scenes
+
+Date: 2026-10-31. Status: accepted.
+
+Context: After the native-resolution rollback, the connected Adreno 610 still
+reported 12-13 presents/s at a 520x240 scene size. Present time averaged
+64-70 ms, with 60-66 ms in GPU submit, while CPU scene construction averaged
+1.4-1.6 ms. The GPU was busy about 99.9% of the sample and thermal status was
+normal. Android's CPU reference path already uses nearest texture sampling for
+bilinear mode, but the GPU scene path still used four bilinear texture taps.
+
+Decision: Apply the same mobile scene-filter policy to the GPU path: Android
+uses nearest texture sampling for Bilinear mode and retains xBR when explicitly
+selected. The final presentation blit still honors the profile's bilinear
+setting. Desktop GPU filtering is unchanged.
+
+Consequences: This removes the per-primitive four-tap filter cost from Android
+GPU scenes and keeps GPU/CPU mobile scene sampling aligned. Performance after
+this change must be measured on the Adreno device; no improvement is claimed
+from the pre-change sample.

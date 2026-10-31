@@ -151,6 +151,17 @@ areas or output sizes. Android runtime evidence remains the connected G100
 farm at 384x240; other devices and Windows Vulkan gameplay remain unverified.
 Android enhanced profiles now stay at native internal resolution (ADR-164).
 
+After the ADR-164 APK was installed, the connected Adreno 610 device
+(SM6225, 1080x2340 display) still showed 12-13 presents/s with a 520x240 scene.
+Across 15 recent log windows, presentation averaged 63.9-69.8 ms and GPU submit
+60.3-66.6 ms; scene construction was 1.4-1.6 ms and encoding 1.7-1.9 ms.
+`/sys/class/kgsl/kgsl-3d0/gpubusy` reported about 99.9% GPU utilization in two
+samples. Thermal status was normal with a 46.7 C GPU reading and 42.6 C skin
+reading. This indicates a GPU workload bottleneck after internal scaling was
+disabled. ADR-165 aligns Android GPU texture sampling with its CPU mobile path
+by skipping per-primitive bilinear taps while keeping bilinear final
+presentation. The new APK's Adreno performance has not yet been measured.
+
 The probe's `--farm-benchmark` option renders 8,192 fixed 8x8 rectangles at
 320x240 and 960x720, with a fresh builder and an explicit GPU fence per frame.
 On the local Windows Radeon RX Vega, D3D12 capture/upload/compute/fence time

@@ -525,7 +525,13 @@ static int hm_host_gpu_present(const RECT *native_area) {
     multisamples = hm_antialiasing_samples(hm_options.antialiasing);
 #endif
 #if defined(HMBTN_ENH_FILTERING) && defined(HMBTN_ENH_PAUSE_MENU)
-    texture_filter = (u32)hm_options.linear;
+    texture_filter = (u32)hm_graphics_scene_filter_mode(&hm_options,
+#ifdef __ANDROID__
+                                                        1
+#else
+                                                        0
+#endif
+    );
 #endif
     u64 cache_serial = interpolate ? 0 : serial;
     int scanout_only = hm_gpu_replay == NULL;
@@ -1489,11 +1495,13 @@ static int hm_host_present_scanout(u64 tick) {
     ) {
         int filter = 0;
 #if defined(HMBTN_ENH_FILTERING) && defined(HMBTN_ENH_PAUSE_MENU)
+        filter = hm_graphics_scene_filter_mode(&hm_options,
 #ifdef __ANDROID__
-        filter = hm_options.linear == 2 ? 2 : 0;
+                                               1
 #else
-        filter = hm_options.linear;
+                                               0
 #endif
+        );
 #endif
         hm_software_output_filter(hm_native_output, filter);
         RECT output_area = *area;

@@ -19,6 +19,14 @@ int hm_graphics_profile_get(const hm_graphics_options *o) {
     return o ? o->profile : HM_GRAPHICS_PROFILE_NATIVE;
 }
 
+int hm_graphics_scene_filter_mode(const hm_graphics_options *o, int mobile) {
+    if (!o)
+        return 0;
+    /* Mobile keeps per-texture sampling cheap; final presentation may still
+     * use the profile's bilinear mode when enlarging the completed scene. */
+    return mobile && o->linear != 2 ? 0 : o->linear;
+}
+
 void hm_graphics_profile_set(hm_graphics_options *o, int profile) {
     if (!o || profile < HM_GRAPHICS_PROFILE_NATIVE || profile > HM_GRAPHICS_PROFILE_MODERN)
         return;

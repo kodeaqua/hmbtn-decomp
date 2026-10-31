@@ -34,4 +34,5 @@ enum {
 };
 int hm_graphics_profile_get(const hm_graphics_options *options);
 void hm_graphics_profile_set(hm_graphics_options *options, int profile);
+int hm_graphics_scene_filter_mode(const hm_graphics_options *options, int mobile);
 #endif

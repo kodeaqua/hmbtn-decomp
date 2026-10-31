@@ -5,7 +5,7 @@
 | Target | Current validation |
 | --- | --- |
 | Windows x86-64 | Release build and 125/125 tests pass. ASan/UBSan game build and all 125 tests pass. Synthetic VRAM scanout matches reference pixels on Vulkan and Direct3D 12. Full-playthrough parity remains unverified. |
-| Android arm64-v8a | Latest Release APK builds with AGP 9.5.0, Gradle 9.8.2, and NDK 30.0.16248370; signature and 16 KB APK zip-alignment checks pass. The owner-tested G100 farm sample reports 100% GPU output in two steady 600-frame windows, zero fallbacks, and two then zero direct VRAM scanouts. It holds 60-61 presents/s with 3.7-4.1 ms average presentation and zero audio-ring underruns/drops. Android internal scaling was reverted by ADR-164 after lag reports; the new build awaits device timing. Other scenes/devices remain unverified. |
+| Android arm64-v8a | Latest Release APK builds with AGP 9.5.0, Gradle 9.8.2, and NDK 30.0.16248370. The owner-tested G100 farm sample reports 100% GPU output in two steady 600-frame windows and 60-61 presents/s at 384x240. After the ADR-164 scaling rollback, an Adreno 610 run still showed 12-13 presents/s at 520x240 with GPU submit around 60-66 ms; ADR-165 reduces Android GPU scene filtering. Performance after ADR-165 awaits device measurement. Other scenes/devices remain unverified. |
 | Linux x86-64 | Deferred to a separate Linux host; WSL is excluded. |
 | macOS universal | No macOS build has been validated. |
 | Matching build | The check target remains unverified on this Windows host because its separate Linux toolchain is unavailable. |
